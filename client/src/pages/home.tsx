@@ -119,6 +119,34 @@ export default function Home() {
 
         <FeatureShowcase />
 
+        {/* How it Works Section */}
+        <section className="py-12 border-t border-b border-border/50 bg-secondary/5 -mx-8 px-8">
+          <div className="max-w-4xl mx-auto text-center space-y-12">
+            <div className="space-y-4">
+              <h2 className="text-3xl font-bold tracking-tight">How It Works</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                Three simple steps to transform your learning experience.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { step: "01", title: "Paste URL", desc: "Copy any YouTube lecture link and paste it into our analyzer." },
+                { step: "02", title: "AI Processing", desc: "Our AI extracts transcripts, generates summaries, and creates quizzes." },
+                { step: "03", title: "Start Learning", desc: "Review the summary, take the quiz, and master the material." }
+              ].map((item, i) => (
+                <div key={i} className="relative p-6 rounded-2xl bg-background border shadow-sm">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground font-bold text-sm py-1 px-3 rounded-full">
+                    {item.step}
+                  </div>
+                  <h3 className="font-bold text-lg mt-4 mb-2">{item.title}</h3>
+                  <p className="text-muted-foreground text-sm">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Visual Element */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
