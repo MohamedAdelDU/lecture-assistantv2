@@ -11,6 +11,9 @@ import { TranscriptView } from "@/components/lecture/TranscriptView";
 import { SummaryView } from "@/components/lecture/SummaryView";
 import { QuizView } from "@/components/lecture/QuizView";
 import { SlidesView } from "@/components/lecture/SlidesView";
+import { FlashcardsView } from "@/components/lecture/FlashcardsView";
+import { ChatAssistant } from "@/components/lecture/ChatAssistant";
+import { Brain } from "lucide-react";
 
 export default function LectureView() {
   const { id } = useParams();
@@ -18,7 +21,7 @@ export default function LectureView() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 pb-20">
         {/* Header */}
         <div className="space-y-4">
           <Link href="/dashboard">
@@ -57,7 +60,7 @@ export default function LectureView() {
 
         {/* Main Content */}
         <Tabs defaultValue="summary" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 lg:w-[600px] mb-8">
+          <TabsList className="grid w-full grid-cols-5 lg:w-[750px] mb-8">
             <TabsTrigger value="transcript">
               <FileText className="w-4 h-4 mr-2" />
               Transcript
@@ -73,6 +76,10 @@ export default function LectureView() {
             <TabsTrigger value="slides">
               <Presentation className="w-4 h-4 mr-2" />
               Slides
+            </TabsTrigger>
+            <TabsTrigger value="flashcards">
+              <Brain className="w-4 h-4 mr-2" />
+              Cards
             </TabsTrigger>
           </TabsList>
 
@@ -92,9 +99,14 @@ export default function LectureView() {
             <TabsContent value="slides" className="mt-0">
               <SlidesView slides={lecture.slides || []} />
             </TabsContent>
+
+            <TabsContent value="flashcards" className="mt-0">
+              <FlashcardsView />
+            </TabsContent>
           </div>
         </Tabs>
       </div>
+      <ChatAssistant />
     </AppLayout>
   );
 }

@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Youtube, Sparkles, Search, Upload, Mic } from "lucide-react";
+import { ArrowRight, Youtube, Sparkles, Upload, Mic, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import generatedImage from '@assets/generated_images/abstract_visualization_of_knowledge_and_learning.png';
+import { FeatureShowcase } from "@/components/home/FeatureShowcase";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -30,29 +31,31 @@ export default function Home() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-16 py-12">
+      <div className="max-w-5xl mx-auto space-y-20 py-12">
         
         {/* Hero Section */}
-        <section className="text-center space-y-6 relative">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px] -z-10" />
+        <section className="text-center space-y-8 relative">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px] -z-10" />
           
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
+            className="space-y-4"
           >
-            <Badge variant="outline" className="mb-4 px-4 py-1 text-sm border-primary/30 text-primary bg-primary/5">
-              <Sparkles className="w-3 h-3 mr-2" />
-              AI-Powered Learning Assistant
-            </Badge>
-            <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6">
-              Turn Lectures into <br />
-              <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
-                Actionable Knowledge
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20 mb-4">
+              <Star className="w-3.5 h-3.5 fill-primary" />
+              <span>New: Flashcard Generation Available</span>
+            </div>
+            
+            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground leading-tight">
+              Master Any Subject <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-500 to-blue-600">
+                In Half The Time
               </span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Paste a YouTube link and get instant transcripts, summaries, quizzes, and slides. Stop pausing, start learning.
+              The all-in-one AI study companion. Convert lectures into summaries, quizzes, flashcards, and slides instantly.
             </p>
           </motion.div>
 
@@ -63,80 +66,74 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="max-w-2xl mx-auto mt-10"
           >
-            <Card className="border-2 shadow-lg shadow-primary/5">
+            <Card className="border-2 shadow-xl shadow-primary/10 overflow-hidden">
               <CardContent className="p-2">
                 <form onSubmit={handleAnalyze} className="flex gap-2">
                   <div className="relative flex-1">
-                    <Youtube className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 w-5 h-5" />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-bold border border-red-100">
+                      <Youtube className="w-3 h-3" />
+                      YouTube
+                    </div>
                     <Input 
-                      placeholder="Paste YouTube URL here..." 
-                      className="pl-10 h-12 text-base border-transparent bg-transparent shadow-none focus-visible:ring-0"
+                      placeholder="Paste video URL here..." 
+                      className="pl-28 h-14 text-lg border-transparent bg-transparent shadow-none focus-visible:ring-0"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                     />
                   </div>
-                  <Button size="lg" type="submit" className="h-12 px-8 text-base" disabled={isAnalyzing}>
-                    {isAnalyzing ? "Analyzing..." : "Start Learning"}
-                    {!isAnalyzing && <ArrowRight className="ml-2 w-4 h-4" />}
+                  <Button size="lg" type="submit" className="h-14 px-8 text-base font-semibold shadow-lg shadow-primary/20" disabled={isAnalyzing}>
+                    {isAnalyzing ? (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Sparkles className="w-5 h-5" />
+                      </motion.div>
+                    ) : (
+                      <>
+                        Analyze Now
+                        <ArrowRight className="ml-2 w-5 h-5" />
+                      </>
+                    )}
                   </Button>
                 </form>
               </CardContent>
             </Card>
-            <div className="flex justify-center gap-6 mt-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1 hover:text-foreground cursor-pointer transition-colors">
-                <Upload className="w-3 h-3" /> Upload Video
-              </span>
-              <span className="flex items-center gap-1 hover:text-foreground cursor-pointer transition-colors">
-                <Mic className="w-3 h-3" /> Record Audio
-              </span>
+            
+            <div className="flex justify-center gap-8 mt-6 text-sm font-medium text-muted-foreground">
+              <button className="flex items-center gap-2 hover:text-primary transition-colors group">
+                <div className="p-2 bg-secondary rounded-full group-hover:bg-primary/10 transition-colors">
+                  <Upload className="w-4 h-4" />
+                </div>
+                Upload File
+              </button>
+              <button className="flex items-center gap-2 hover:text-primary transition-colors group">
+                <div className="p-2 bg-secondary rounded-full group-hover:bg-primary/10 transition-colors">
+                  <Mic className="w-4 h-4" />
+                </div>
+                Record Audio
+              </button>
             </div>
           </motion.div>
         </section>
 
-        {/* Features Grid */}
-        <section className="grid md:grid-cols-3 gap-8">
-          {[
-            {
-              title: "Smart Summaries",
-              desc: "Get the gist in seconds with AI-generated bullet points and key takeaways.",
-              icon: "📝"
-            },
-            {
-              title: "Interactive Quizzes",
-              desc: "Test your knowledge immediately with auto-generated multiple choice questions.",
-              icon: "🧠"
-            },
-            {
-              title: "Ready-to-use Slides",
-              desc: "Download a presentation deck based on the lecture structure instantly.",
-              icon: "📊"
-            }
-          ].map((feature, i) => (
-            <motion.div 
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 + (i * 0.1) }}
-            >
-              <Card className="h-full hover:border-primary/50 transition-colors group cursor-default">
-                <CardContent className="p-6">
-                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">{feature.icon}</div>
-                  <h3 className="font-bold text-lg mb-2">{feature.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">{feature.desc}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </section>
+        <FeatureShowcase />
 
         {/* Visual Element */}
         <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.8 }}
-          className="rounded-2xl overflow-hidden border shadow-2xl"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1, delay: 0.4 }}
+          className="rounded-2xl overflow-hidden border-4 border-white/20 shadow-2xl mx-auto max-w-4xl bg-black"
         >
-           <img src={generatedImage} alt="App interface preview" className="w-full h-auto object-cover opacity-90" />
+           <div className="relative aspect-video">
+             <img src={generatedImage} alt="App interface preview" className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity duration-700" />
+             <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
+             <div className="absolute bottom-8 left-8 right-8 text-center">
+               <p className="text-white/90 text-lg font-medium">"LectureMate transformed how I study for finals. I saved 10+ hours per week."</p>
+               <p className="text-white/60 text-sm mt-2">— Sarah K., Medical Student</p>
+             </div>
+           </div>
         </motion.div>
 
       </div>
