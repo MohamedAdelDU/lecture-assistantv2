@@ -3,7 +3,7 @@ import { LayoutDashboard, Video, FolderOpen, Settings, LogOut, PlusCircle, User 
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-export function Sidebar() {
+export function SidebarContent() {
   const [location] = useLocation();
 
   const links = [
@@ -13,7 +13,7 @@ export function Sidebar() {
   ];
 
   return (
-    <div className="w-64 h-screen bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 transition-all duration-300">
+    <div className="flex flex-col h-full">
       <div className="p-6">
         <div className="flex items-center gap-3 text-sidebar-primary mb-8">
           <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center text-white">
@@ -70,6 +70,14 @@ export function Sidebar() {
           </div>
         </Link>
       </div>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <div className="w-64 h-screen bg-sidebar border-r border-sidebar-border hidden md:flex flex-col flex-shrink-0 transition-all duration-300">
+      <SidebarContent />
     </div>
   );
 }
