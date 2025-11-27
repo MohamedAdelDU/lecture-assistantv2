@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import History from "@/pages/history";
 import Dashboard from "@/pages/dashboard";
 import LectureView from "@/pages/lecture-view";
 import SignIn from "@/pages/auth/sign-in";
@@ -16,7 +17,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/dashboard" component={Dashboard} />
-      <Route path="/history" component={Dashboard} />
+      <Route path="/history" component={History} />
       <Route path="/lecture/:id" component={LectureView} />
       <Route path="/sign-in" component={SignIn} />
       <Route path="/sign-up" component={SignUp} />
