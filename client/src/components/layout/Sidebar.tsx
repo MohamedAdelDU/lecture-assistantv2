@@ -7,9 +7,9 @@ export function Sidebar() {
   const [location] = useLocation();
 
   const links = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/history", icon: FolderOpen, label: "My Lectures" },
-    { href: "/", icon: PlusCircle, label: "New Analysis" },
+    { href: "/", icon: PlusCircle, label: "تحليل جديد" },
+    { href: "/dashboard", icon: LayoutDashboard, label: "لوحة المعلومات" },
+    { href: "/history", icon: FolderOpen, label: "محاضراتي" },
   ];
 
   return (
@@ -29,14 +29,14 @@ export function Sidebar() {
               <Link key={link.href} href={link.href}>
                 <div
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer justify-end",
                     isActive
                       ? "bg-sidebar-primary/10 text-sidebar-primary"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   )}
                 >
+                  <span className="flex-1 text-right">{link.label}</span>
                   <link.icon size={18} />
-                  {link.label}
                 </div>
               </Link>
             );
@@ -47,25 +47,25 @@ export function Sidebar() {
       <div className="mt-auto p-6 border-t border-sidebar-border space-y-4">
         <Link href="/profile">
           <div className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer justify-end",
             location === "/profile" 
               ? "bg-sidebar-primary/10 text-sidebar-primary"
               : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
           )}>
+            <span className="flex-1 text-right">الإعدادات</span>
             <Settings size={18} />
-            Settings
           </div>
         </Link>
         
         <Link href="/profile">
-          <div className="flex items-center gap-3 pt-2 border-t border-sidebar-border/50 cursor-pointer hover:opacity-80 transition-opacity">
+          <div className="flex items-center gap-3 pt-2 border-t border-sidebar-border/50 cursor-pointer hover:opacity-80 transition-opacity flex-row-reverse">
             <Avatar className="w-9 h-9 border">
               <AvatarImage src="https://github.com/shadcn.png" />
               <AvatarFallback>JD</AvatarFallback>
             </Avatar>
-            <div className="flex flex-col">
+            <div className="flex flex-col items-end">
               <span className="text-sm font-medium text-sidebar-foreground">John Doe</span>
-              <span className="text-xs text-muted-foreground">Pro Plan</span>
+              <span className="text-xs text-muted-foreground">خطة برو</span>
             </div>
           </div>
         </Link>
