@@ -75,8 +75,8 @@ export default function Home() {
                       YouTube
                     </div>
                     <Input 
-                      placeholder="Paste video URL here..." 
-                      className="pl-28 h-14 text-lg border-transparent bg-transparent shadow-none focus-visible:ring-0"
+                      placeholder="Paste video URL..." 
+                      className="pl-12 sm:pl-28 h-14 text-base md:text-lg border-transparent bg-transparent shadow-none focus-visible:ring-0"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                     />
