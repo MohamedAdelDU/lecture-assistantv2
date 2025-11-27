@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Video, FolderOpen, Settings, LogOut, PlusCircle } from "lucide-react";
+import { LayoutDashboard, Video, FolderOpen, Settings, LogOut, PlusCircle, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -43,11 +44,31 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="mt-auto p-6 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground cursor-pointer transition-colors">
-          <Settings size={18} />
-          Settings
-        </div>
+      <div className="mt-auto p-6 border-t border-sidebar-border space-y-4">
+        <Link href="/profile">
+          <div className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+            location === "/profile" 
+              ? "bg-sidebar-primary/10 text-sidebar-primary"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          )}>
+            <Settings size={18} />
+            Settings
+          </div>
+        </Link>
+        
+        <Link href="/profile">
+          <div className="flex items-center gap-3 pt-2 border-t border-sidebar-border/50 cursor-pointer hover:opacity-80 transition-opacity">
+            <Avatar className="w-9 h-9 border">
+              <AvatarImage src="https://github.com/shadcn.png" />
+              <AvatarFallback>JD</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-sidebar-foreground">John Doe</span>
+              <span className="text-xs text-muted-foreground">Pro Plan</span>
+            </div>
+          </div>
+        </Link>
       </div>
     </div>
   );

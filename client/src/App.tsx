@@ -7,6 +7,9 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import LectureView from "@/pages/lecture-view";
+import SignIn from "@/pages/auth/sign-in";
+import SignUp from "@/pages/auth/sign-up";
+import Profile from "@/pages/profile";
 
 function Router() {
   return (
@@ -15,6 +18,9 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/history" component={Dashboard} />
       <Route path="/lecture/:id" component={LectureView} />
+      <Route path="/sign-in" component={SignIn} />
+      <Route path="/sign-up" component={SignUp} />
+      <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
   );
