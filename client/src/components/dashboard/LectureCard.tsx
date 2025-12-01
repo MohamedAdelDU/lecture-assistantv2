@@ -2,28 +2,130 @@ import { Lecture } from "@/lib/mockData";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, Calendar, ArrowRight, PlayCircle, FileText } from "lucide-react";
+import { Clock, Calendar, ArrowRight, PlayCircle, FileText, Trash2, X } from "lucide-react";
 import { Link } from "wouter";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useLectures } from "@/hooks/useLectures";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface LectureCardProps {
   lecture: Lecture;
 }
 
 export function LectureCard({ lecture }: LectureCardProps) {
+  const { deleteLecture, updateLecture, isDeleting, isUpdating } = useLectures();
+  const { toast } = useToast();
+  const [isDeletingLocal, setIsDeletingLocal] = useState(false);
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDeletingLocal(true);
+    try {
+      await deleteLecture(lecture.id);
+      toast({
+        title: "Lecture deleted",
+        description: "The lecture has been deleted successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete lecture.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingLocal(false);
+    }
+  };
+
+  const handleStopProcessing = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await updateLecture({ lectureId: lecture.id, updates: { status: "failed" } });
+      toast({
+        title: "Processing stopped",
+        description: "The lecture processing has been stopped.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to stop processing.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <Link href={`/lecture/${lecture.id}`}>
-      <Card className="overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group border-border/60 hover:border-primary/50">
+    <Card className="overflow-hidden hover:shadow-md transition-all duration-300 group border-border/60 hover:border-primary/50 relative">
+      {/* Action buttons - top right */}
+      <div className="absolute top-2 right-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {lecture.status === "processing" && (
+          <Button
+            size="icon"
+            variant="destructive"
+            className="h-8 w-8"
+            onClick={handleStopProcessing}
+            disabled={isUpdating}
+            title="Stop processing"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              size="icon"
+              variant="destructive"
+              className="h-8 w-8"
+              onClick={(e) => e.stopPropagation()}
+              disabled={isDeleting || isDeletingLocal}
+              title="Delete lecture"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the lecture
+                "{lecture.title}" and all of its data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
+      <Link href={`/lecture/${lecture.id}`} className="block">
         <div className="relative aspect-video overflow-hidden bg-muted">
           <img 
-            src={lecture.thumbnailUrl} 
+            src={lecture.thumbnailUrl || ""} 
             alt={lecture.title}
             className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
           />
           <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
           
           <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
-            {lecture.duration}
+            {lecture.duration || "0:00"}
           </div>
           
           {lecture.status === "processing" && (
@@ -31,13 +133,14 @@ export function LectureCard({ lecture }: LectureCardProps) {
               <div className="w-full max-w-[200px] space-y-2">
                 <div className="flex justify-between text-xs text-white font-medium">
                   <span>Processing...</span>
-                  <span>{lecture.progress}%</span>
+                  <span>{lecture.progress || 0}%</span>
                 </div>
-                <Progress value={lecture.progress} className="h-2 bg-white/20" />
+                <Progress value={lecture.progress || 0} className="h-2 bg-white/20" />
               </div>
             </div>
           )}
         </div>
+      </Link>
         
         <CardContent className="p-4">
           <div className="flex items-start justify-between mb-2">
@@ -67,6 +170,5 @@ export function LectureCard({ lecture }: LectureCardProps) {
           <ArrowRight size={16} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-primary" />
         </CardFooter>
       </Card>
-    </Link>
   );
 }

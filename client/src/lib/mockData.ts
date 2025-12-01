@@ -25,7 +25,7 @@ export interface Lecture {
   date: string;
   status: LectureStatus;
   progress?: number; // 0-100
-  summary?: string[];
+  summary?: string | string[]; // Support both long-form string (new) and array (legacy)
   transcript?: string;
   questions?: Question[];
   slides?: Slide[];

@@ -3,17 +3,20 @@ import { ReactNode } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Video } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function AppLayout({ children }: { children: ReactNode }) {
+  const { isRTL } = useLanguage();
+
   return (
-    <div className="flex min-h-screen bg-background font-sans">
+    <div className={`flex min-h-screen bg-background font-sans ${isRTL ? "flex-row-reverse" : ""}`}>
       {/* Desktop Sidebar */}
       <Sidebar />
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between p-4 border-b bg-sidebar">
-          <div className="flex items-center gap-2">
+        <div className={`md:hidden flex items-center justify-between p-4 border-b bg-sidebar ${isRTL ? "flex-row-reverse" : ""}`}>
+          <div className={`flex items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
               <Video size={18} strokeWidth={3} />
             </div>
@@ -26,7 +29,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-72 bg-sidebar border-r border-sidebar-border">
+            <SheetContent side={isRTL ? "right" : "left"} className="p-0 w-72 bg-sidebar border-sidebar-border" style={isRTL ? { borderLeft: "1px solid" } : { borderRight: "1px solid" }}>
               <SidebarContent />
             </SheetContent>
           </Sheet>

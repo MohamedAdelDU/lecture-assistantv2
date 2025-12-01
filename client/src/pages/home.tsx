@@ -5,164 +5,849 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Youtube, Sparkles, Upload, Mic, Star } from "lucide-react";
+import { ArrowRight, Youtube, Sparkles, Upload, Mic, Star, Cpu, Cloud } from "lucide-react";
 import { motion } from "framer-motion";
-import generatedImage from '@assets/generated_images/abstract_visualization_of_knowledge_and_learning.png';
 import { FeatureShowcase } from "@/components/home/FeatureShowcase";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLectures } from "@/hooks/useLectures";
+import { extractVideoId, getYouTubeThumbnail, getYouTubeVideoInfo, getYouTubeTranscript } from "@/lib/youtubeService";
+import { generateSummary, generateQuiz, generateSlides } from "@/lib/aiService";
+import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Home() {
+  const { user } = useAuth();
+  const { createLecture, updateLecture, isCreating } = useLectures();
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [url, setUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [processingLectureId, setProcessingLectureId] = useState<string | null>(null);
+  const [isProcessingStopped, setIsProcessingStopped] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<"gpu" | "api">("api");
+  const { language } = useLanguage();
 
-  const handleAnalyze = (e: React.FormEvent) => {
+  const t = {
+    heroBadge:
+      language === "ar"
+        ? "جديد: البطاقات التعليمية متاحة الآن"
+        : "New: Flashcard Generation Available",
+    heroTitleLine1: language === "ar" ? "أتقن أي مادة" : "Master Any Subject",
+    heroTitleLine2: language === "ar" ? "في نصف الوقت" : "In Half The Time",
+    heroSubtitle:
+      language === "ar"
+        ? "رفيق الدراسة بالذكاء الاصطناعي: حوّل المحاضرات إلى ملخصات واختبارات وبطاقات تعليمية وشرائح عرض فوراً."
+        : "The all-in-one AI study companion. Convert lectures into summaries, quizzes, flashcards, and slides instantly.",
+    inputPlaceholder:
+      language === "ar"
+        ? "ألصق رابط فيديو يوتيوب هنا..."
+        : "Paste video URL...",
+    analyzeNow: language === "ar" ? "ابدأ التحليل" : "Analyze Now",
+    uploadFile: language === "ar" ? "رفع ملف" : "Upload File",
+    recordAudio: language === "ar" ? "تسجيل صوت" : "Record Audio",
+    selectModel: language === "ar" ? "اختر الموديل" : "Select Model",
+    modelGpu: language === "ar" ? "LM-Titan (GPU)" : "LM-Titan (GPU)",
+    modelApi: language === "ar" ? "LM-Cloud (API)" : "LM-Cloud (API)",
+    modelGpuDesc: language === "ar" ? "يعمل على الموديلات المحلية المعتمدة على GPU (Ollama)" : "Runs on local GPU-based models (Ollama)",
+    modelApiDesc: language === "ar" ? "يعمل على API السحابي (Gemini)" : "Runs on cloud API (Gemini)",
+    modelGpuTooltip: language === "ar" 
+      ? "يستخدم موديلات محلية تعمل على GPU الخاص بك. أسرع وأكثر خصوصية، لكن يتطلب GPU قوي."
+      : "Uses local models running on your GPU. Faster and more private, but requires a powerful GPU.",
+    modelApiTooltip: language === "ar"
+      ? "يستخدم Google Gemini API السحابي. لا يحتاج GPU، لكن يتطلب اتصال بالإنترنت وAPI key."
+      : "Uses Google Gemini cloud API. No GPU needed, but requires internet connection and API key.",
+    howItWorksTitle: language === "ar" ? "كيف يعمل؟" : "How It Works",
+    howItWorksSubtitle:
+      language === "ar"
+        ? "ثلاث خطوات بسيطة لتغيير تجربة تعلّمك."
+        : "Three simple steps to transform your learning experience.",
+    steps:
+      language === "ar"
+        ? [
+            {
+              step: "01",
+              title: "ألصق الرابط",
+              desc: "انسخ أي رابط محاضرة من يوتيوب وألصقه في المحلل.",
+            },
+            {
+              step: "02",
+              title: "معالجة بالذكاء الاصطناعي",
+              desc: "نستخرج النص وننشئ ملخصاً وأسئلة وشرائح عرض.",
+            },
+            {
+              step: "03",
+              title: "ابدأ التعلّم",
+              desc: "استعرض الملخص وأجب عن الأسئلة وراجع المادة بسهولة.",
+            },
+          ]
+        : [
+            {
+              step: "01",
+              title: "Paste URL",
+              desc: "Copy any YouTube lecture link and paste it into our analyzer.",
+            },
+            {
+              step: "02",
+              title: "AI Processing",
+              desc: "Our AI extracts transcripts, generates summaries, and creates quizzes.",
+            },
+            {
+              step: "03",
+              title: "Start Learning",
+              desc: "Review the summary, take the quiz, and master the material.",
+            },
+          ],
+  };
+
+  const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url) return;
     
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to analyze lectures.",
+        variant: "destructive",
+      });
+      setLocation("/sign-in");
+      return;
+    }
+    
     setIsAnalyzing(true);
     
-    // Simulate processing delay before redirect
-    setTimeout(() => {
-      // In a real app, we'd create the resource first.
-      // Here we just go to a mock ID.
-      setLocation("/lecture/1"); 
-    }, 1500);
+    try {
+      // Extract video ID
+      const videoId = extractVideoId(url);
+      if (!videoId) {
+        throw new Error("Invalid YouTube URL");
+      }
+
+      // Get video info
+      const videoInfo = await getYouTubeVideoInfo(videoId);
+      if (!videoInfo) {
+        throw new Error("Could not fetch video information");
+      }
+
+      // Create lecture with processing status
+      const newLecture = await createLecture({
+        title: videoInfo.title,
+        thumbnailUrl: videoInfo.thumbnailUrl,
+        duration: videoInfo.duration,
+        status: "processing",
+        progress: 0,
+      });
+
+      const lectureId = newLecture.id;
+      if (!lectureId) {
+        throw new Error("Failed to create lecture - no ID returned");
+      }
+
+      setProcessingLectureId(lectureId);
+      setIsProcessingStopped(false);
+
+      toast({
+        title: "Lecture created!",
+        description: "Processing your lecture...",
+      });
+
+      // Process in background
+      processLecture(lectureId, videoId, videoInfo);
+
+      // Redirect to lecture page
+      setLocation(`/lecture/${lectureId}`);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to analyze lecture. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const processLecture = async (lectureId: string, videoId: string, videoInfo: any) => {
+    try {
+      if (!user?.uid) return;
+
+      // Check if processing was stopped
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
+      // Update progress
+      await updateLecture({ lectureId, updates: { progress: 20 } });
+      
+      // Check again after update
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
+      // Get transcript
+      console.log(`[Home] Fetching transcript for video: ${videoId}`);
+      const transcript = await getYouTubeTranscript(videoId);
+      console.log(`[Home] Transcript received:`, {
+        length: transcript?.length || 0,
+        preview: transcript?.substring(0, 100) || "empty"
+      });
+      
+      if (!transcript || transcript.length === 0) {
+        throw new Error("Could not extract transcript or transcript is empty");
+      }
+
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
+      console.log(`[Home] Saving transcript to Firestore for lecture: ${lectureId}`);
+      await updateLecture({ lectureId, updates: { progress: 40, transcript } });
+      console.log(`[Home] Transcript saved successfully`);
+
+      // Generate summary with selected model
+      const summary = await generateSummary(transcript, selectedModel);
+      
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
+      await updateLecture({ lectureId, updates: { progress: 60, summary } });
+
+      // Generate quiz with selected model
+      const questions = await generateQuiz(transcript, selectedModel);
+      
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
+      await updateLecture({ lectureId, updates: { progress: 80, questions } });
+
+      // Generate slides
+      const slides = await generateSlides(transcript, summary);
+      
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
+      await updateLecture({ lectureId, updates: { progress: 100, slides, status: "completed" } });
+
+      setProcessingLectureId(null);
+      setIsProcessingStopped(false);
+
+      toast({
+        title: "Processing complete!",
+        description: "Your lecture has been analyzed successfully.",
+      });
+    } catch (error: any) {
+      if (!isProcessingStopped || processingLectureId !== lectureId) {
+        await updateLecture({ lectureId, updates: { status: "failed" } });
+        toast({
+          title: "Processing failed",
+          description: error.message || "Failed to process lecture.",
+          variant: "destructive",
+        });
+      }
+      setProcessingLectureId(null);
+      setIsProcessingStopped(false);
+    }
   };
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto space-y-20 py-12">
+      {/* Decorative Background Elements */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+      </div>
+      
+      <div className={`max-w-6xl mx-auto space-y-24 py-8 md:py-16 px-4 relative ${language === "ar" ? "rtl" : "ltr"}`}>
         
         {/* Hero Section */}
-        <section className="text-center space-y-8 relative">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px] -z-10" />
+        <section className="text-center space-y-10 relative overflow-hidden">
+          {/* Animated Background Gradient */}
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [0.3, 0.5, 0.3],
+            }}
+            transition={{ 
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-600/10 rounded-full blur-[140px] -z-10" 
+          />
           
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="space-y-4"
+            transition={{ duration: 0.6 }}
+            className="space-y-6 relative z-10"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20 mb-4">
-              <Star className="w-3.5 h-3.5 fill-primary" />
-              <span>New: Flashcard Generation Available</span>
-            </div>
+            {/* Badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-primary/20 via-primary/15 to-primary/20 text-primary text-sm font-semibold border border-primary/30 shadow-lg shadow-primary/10 backdrop-blur-sm"
+            >
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+              >
+                <Star className="w-4 h-4 fill-primary" />
+              </motion.div>
+              <span>{t.heroBadge}</span>
+            </motion.div>
             
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground leading-tight">
-              Master Any Subject <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-500 to-blue-600">
-                In Half The Time
-              </span>
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              The all-in-one AI study companion. Convert lectures into summaries, quizzes, flashcards, and slides instantly.
-            </p>
+            {/* Title */}
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-foreground leading-[1.1]"
+            >
+              <span className="block">{t.heroTitleLine1}</span>
+              <motion.span 
+                initial={{ opacity: 0, x: language === "ar" ? -20 : 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.5, duration: 0.6 }}
+                className="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-500 to-blue-600 animate-gradient"
+              >
+                {t.heroTitleLine2}
+              </motion.span>
+            </motion.h1>
+            
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
+            >
+              {t.heroSubtitle}
+            </motion.p>
           </motion.div>
 
           {/* Input Area */}
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="max-w-2xl mx-auto mt-10"
+            transition={{ duration: 0.6, delay: 0.6 }}
+            className="max-w-3xl mx-auto mt-12"
           >
-            <Card className="border-2 shadow-xl shadow-primary/10 overflow-hidden">
-              <CardContent className="p-2">
-                <form onSubmit={handleAnalyze} className="flex gap-2">
-                  <div className="relative flex-1">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-bold border border-red-100">
-                      <Youtube className="w-3 h-3" />
-                      YouTube
-                    </div>
-                    <Input 
-                      placeholder="Paste video URL..." 
-                      className="pl-12 sm:pl-28 h-14 text-base md:text-lg border-transparent bg-transparent shadow-none focus-visible:ring-0"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                    />
-                  </div>
-                  <Button size="lg" type="submit" className="h-14 px-8 text-base font-semibold shadow-lg shadow-primary/20" disabled={isAnalyzing}>
-                    {isAnalyzing ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            <Card className="border-2 shadow-2xl shadow-primary/20 overflow-hidden bg-card/50 backdrop-blur-sm hover:shadow-primary/30 transition-all duration-300">
+              <CardContent className="p-4 md:p-6">
+                <form onSubmit={handleAnalyze} className="flex flex-col gap-4">
+                  <div className={`flex gap-3 ${language === "ar" ? "flex-row-reverse" : ""}`}>
+                    <div className="relative flex-1 group">
+                      <motion.div 
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.8 }}
+                        className={`absolute ${language === "ar" ? "right-4" : "left-4"} top-1/2 -translate-y-1/2 z-10 flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold border border-red-200 dark:border-red-800 shadow-sm group-hover:scale-105 transition-transform pointer-events-none`}
                       >
-                        <Sparkles className="w-5 h-5" />
+                        <Youtube className="w-3.5 h-3.5" />
+                        <span>YouTube</span>
                       </motion.div>
-                    ) : (
-                      <>
-                        Analyze Now
-                        <ArrowRight className="ml-2 w-5 h-5" />
-                      </>
-                    )}
-                  </Button>
+                      <Input 
+                        placeholder={t.inputPlaceholder}
+                        className={`${language === "ar" ? "pr-28 sm:pr-32 text-right" : "pl-28 sm:pl-32"} h-16 text-base md:text-lg border-2 border-border/50 bg-background/80 backdrop-blur-sm focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all relative z-0`}
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        dir={language === "ar" ? "rtl" : "ltr"}
+                      />
+                    </div>
+                    <motion.div
+                      whileHover={{ 
+                        scale: 1.02,
+                        y: -2,
+                      }}
+                      whileTap={{ 
+                        scale: 0.98,
+                        y: 0,
+                      }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 17,
+                      }}
+                      className="relative"
+                    >
+                      <motion.div
+                        className="absolute inset-0 rounded-md bg-gradient-to-r from-primary via-purple-500 to-primary opacity-0 blur-xl"
+                        animate={{
+                          opacity: isAnalyzing || isCreating ? [0.5, 0.8, 0.5] : 0,
+                          scale: [1, 1.2, 1],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                        }}
+                      />
+                      <Button 
+                        size="lg" 
+                        type="submit" 
+                        className="relative h-16 px-8 md:px-10 text-base font-semibold shadow-xl shadow-primary/30 hover:shadow-primary/50 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all duration-300 overflow-hidden group" 
+                        disabled={isAnalyzing || isCreating}
+                      >
+                        {/* Shimmer effect */}
+                        <motion.div
+                          className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                          animate={{
+                            translateX: isAnalyzing || isCreating ? ["100%", "200%"] : "100%",
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                        />
+                        
+                        {isAnalyzing || isCreating ? (
+                          <motion.div
+                            className="flex items-center gap-2 relative z-10"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <motion.div
+                              animate={{ 
+                                rotate: 360,
+                                scale: [1, 1.1, 1],
+                              }}
+                              transition={{ 
+                                rotate: {
+                                  duration: 2,
+                                  repeat: Infinity,
+                                  ease: "linear",
+                                },
+                                scale: {
+                                  duration: 1.5,
+                                  repeat: Infinity,
+                                  ease: "easeInOut",
+                                },
+                              }}
+                            >
+                              <Sparkles className="w-5 h-5" />
+                            </motion.div>
+                            <motion.span 
+                              className={language === "ar" ? "mr-2" : "ml-2"}
+                              animate={{
+                                opacity: [0.7, 1, 0.7],
+                              }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            >
+                              {language === "ar" ? "جاري التحليل..." : "Analyzing..."}
+                            </motion.span>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            className="flex items-center gap-2 relative z-10"
+                            initial={false}
+                            whileHover={{
+                              x: language === "ar" ? -4 : 4,
+                            }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 400,
+                              damping: 17,
+                            }}
+                          >
+                            <span>{t.analyzeNow}</span>
+                            <motion.div
+                              animate={{
+                                x: [0, language === "ar" ? -3 : 3, 0],
+                              }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            >
+                              <ArrowRight className={`w-5 h-5 ${language === "ar" ? "mr-2 rotate-180" : "ml-2"}`} />
+                            </motion.div>
+                          </motion.div>
+                        )}
+                      </Button>
+                    </motion.div>
+                  </div>
+                  
+                  {/* Model Selection */}
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.9 }}
+                    className={`flex items-center gap-3 px-2 ${language === "ar" ? "flex-row-reverse" : ""}`}
+                  >
+                    <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{t.selectModel}:</span>
+                    <div className={`flex gap-2 flex-1 ${language === "ar" ? "flex-row-reverse" : ""}`}>
+                      <motion.button
+                        type="button"
+                        onClick={() => setSelectedModel("gpu")}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                          selectedModel === "gpu"
+                            ? "bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-lg shadow-primary/30"
+                            : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
+                        }`}
+                      >
+                        <Cpu className="w-4 h-4" />
+                        <span>{t.modelGpu}</span>
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        onClick={() => setSelectedModel("api")}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                          selectedModel === "api"
+                            ? "bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-lg shadow-primary/30"
+                            : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
+                        }`}
+                      >
+                        <Cloud className="w-4 h-4" />
+                        <span>{t.modelApi}</span>
+                      </motion.button>
+                    </div>
+                  </motion.div>
                 </form>
               </CardContent>
             </Card>
             
-            <div className="flex justify-center gap-8 mt-6 text-sm font-medium text-muted-foreground">
-              <button className="flex items-center gap-2 hover:text-primary transition-colors group">
-                <div className="p-2 bg-secondary rounded-full group-hover:bg-primary/10 transition-colors">
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1 }}
+              className={`flex justify-center gap-8 mt-8 text-sm font-medium text-muted-foreground ${language === "ar" ? "flex-row-reverse" : ""}`}
+            >
+              <motion.button 
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-2 hover:text-primary transition-colors group"
+              >
+                <motion.div 
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.5 }}
+                  className="p-2.5 bg-secondary rounded-full group-hover:bg-primary/10 transition-colors"
+                >
                   <Upload className="w-4 h-4" />
-                </div>
-                Upload File
-              </button>
-              <button className="flex items-center gap-2 hover:text-primary transition-colors group">
-                <div className="p-2 bg-secondary rounded-full group-hover:bg-primary/10 transition-colors">
+                </motion.div>
+                {t.uploadFile}
+              </motion.button>
+              <motion.button 
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-2 hover:text-primary transition-colors group"
+              >
+                <motion.div 
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.5 }}
+                  className="p-2.5 bg-secondary rounded-full group-hover:bg-primary/10 transition-colors"
+                >
                   <Mic className="w-4 h-4" />
-                </div>
-                Record Audio
-              </button>
-            </div>
+                </motion.div>
+                {t.recordAudio}
+              </motion.button>
+            </motion.div>
           </motion.div>
         </section>
 
         <FeatureShowcase />
 
-        {/* How it Works Section */}
-        <section className="py-12 border-t border-b border-border/50 bg-secondary/5 -mx-8 px-8">
-          <div className="max-w-4xl mx-auto text-center space-y-12">
-            <div className="space-y-4">
-              <h2 className="text-3xl font-bold tracking-tight">How It Works</h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                Three simple steps to transform your learning experience.
+        {/* Models Comparison Section */}
+        <motion.section 
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="py-16 bg-gradient-to-b from-background via-secondary/5 to-background rounded-3xl border border-border/50"
+        >
+          <div className="max-w-5xl mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                {language === "ar" ? "اختر الموديل المناسب لك" : "Choose the Right Model for You"}
+              </h2>
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                {language === "ar" 
+                  ? "نوفر لك خيارين قويين لمعالجة المحاضرات بالذكاء الاصطناعي"
+                  : "We offer two powerful options for AI-powered lecture processing"}
               </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* GPU Model Card */}
+              <motion.div
+                initial={{ opacity: 0, x: language === "ar" ? 20 : -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                whileHover={{ y: -5, scale: 1.02 }}
+                className="relative group"
+              >
+                <Card className="h-full border-2 border-blue-500/20 hover:border-blue-500/50 transition-all duration-300 shadow-lg hover:shadow-xl bg-gradient-to-br from-blue-50/50 dark:from-blue-950/20 to-background">
+                  <CardContent className="p-6 md:p-8">
+                    <div className="flex items-start gap-4 mb-6">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
+                        <Cpu className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold mb-1">{t.modelGpu}</h3>
+                        <p className="text-sm text-muted-foreground">{t.modelGpuDesc}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2 text-foreground flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                          {language === "ar" ? "المميزات" : "Advantages"}
+                        </h4>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-500 mt-1">✓</span>
+                            <span>{language === "ar" ? "أسرع - لا يعتمد على الإنترنت" : "Faster - No internet dependency"}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-500 mt-1">✓</span>
+                            <span>{language === "ar" ? "أكثر خصوصية - البيانات محلية" : "More private - Data stays local"}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-500 mt-1">✓</span>
+                            <span>{language === "ar" ? "مجاني تماماً" : "Completely free"}</span>
+                          </li>
+                        </ul>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2 text-foreground flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          {language === "ar" ? "المتطلبات" : "Requirements"}
+                        </h4>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-500 mt-1">•</span>
+                            <span>{language === "ar" ? "GPU قوي (NVIDIA مع CUDA)" : "Powerful GPU (NVIDIA with CUDA)"}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-500 mt-1">•</span>
+                            <span>{language === "ar" ? "تثبيت Ollama على الجهاز" : "Ollama installed locally"}</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* API Model Card */}
+              <motion.div
+                initial={{ opacity: 0, x: language === "ar" ? -20 : 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                whileHover={{ y: -5, scale: 1.02 }}
+                className="relative group"
+              >
+                <Card className="h-full border-2 border-purple-500/20 hover:border-purple-500/50 transition-all duration-300 shadow-lg hover:shadow-xl bg-gradient-to-br from-purple-50/50 dark:from-purple-950/20 to-background">
+                  <CardContent className="p-6 md:p-8">
+                    <div className="flex items-start gap-4 mb-6">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg">
+                        <Cloud className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold mb-1">{t.modelApi}</h3>
+                        <p className="text-sm text-muted-foreground">{t.modelApiDesc}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2 text-foreground flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                          {language === "ar" ? "المميزات" : "Advantages"}
+                        </h4>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-500 mt-1">✓</span>
+                            <span>{language === "ar" ? "لا يحتاج GPU - يعمل على أي جهاز" : "No GPU needed - Works on any device"}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-500 mt-1">✓</span>
+                            <span>{language === "ar" ? "جودة عالية - من Google" : "High quality - Powered by Google"}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-500 mt-1">✓</span>
+                            <span>{language === "ar" ? "سهل الإعداد" : "Easy setup"}</span>
+                          </li>
+                        </ul>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2 text-foreground flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          {language === "ar" ? "المتطلبات" : "Requirements"}
+                        </h4>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-500 mt-1">•</span>
+                            <span>{language === "ar" ? "اتصال بالإنترنت" : "Internet connection"}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-500 mt-1">•</span>
+                            <span>{language === "ar" ? "Gemini API Key" : "Gemini API Key"}</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
-              {[
-                { step: "01", title: "Paste URL", desc: "Copy any YouTube lecture link and paste it into our analyzer." },
-                { step: "02", title: "AI Processing", desc: "Our AI extracts transcripts, generates summaries, and creates quizzes." },
-                { step: "03", title: "Start Learning", desc: "Review the summary, take the quiz, and master the material." }
-              ].map((item, i) => (
-                <div key={i} className="relative p-6 rounded-2xl bg-background border shadow-sm">
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground font-bold text-sm py-1 px-3 rounded-full">
-                    {item.step}
-                  </div>
-                  <h3 className="font-bold text-lg mt-4 mb-2">{item.title}</h3>
-                  <p className="text-muted-foreground text-sm">{item.desc}</p>
+            {/* Recommendation */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="mt-8 p-6 rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-600/10 border border-primary/20"
+            >
+              <div className="flex items-start gap-4">
+                <div className="p-2 rounded-lg bg-primary/20">
+                  <Sparkles className="w-5 h-5 text-primary" />
                 </div>
-              ))}
+                <div>
+                  <h4 className="font-semibold mb-2">{language === "ar" ? "نصيحة" : "Recommendation"}</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {language === "ar" 
+                      ? "إذا كان لديك GPU قوي، ننصح باستخدام LM-Titan للحصول على سرعة وخصوصية أكبر. أما إذا لم يكن لديك GPU، فـ LM-Cloud هو الخيار الأمثل لك."
+                      : "If you have a powerful GPU, we recommend using LM-Titan for better speed and privacy. If you don't have a GPU, LM-Cloud is the perfect choice for you."}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.section>
+
+        {/* How it Works Section */}
+        <motion.section 
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="py-16 border-t border-b border-border/50 bg-gradient-to-b from-secondary/5 via-background to-secondary/5 -mx-4 md:-mx-8 px-4 md:px-8"
+        >
+          <div className="max-w-5xl mx-auto text-center space-y-16">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="space-y-4"
+            >
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                {t.howItWorksTitle}
+              </h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+                {t.howItWorksSubtitle}
+              </p>
+            </motion.div>
+
+            <div className="relative">
+              <div className="grid md:grid-cols-3 gap-6 md:gap-8 relative">
+                {t.steps.map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: i * 0.2 }}
+                    whileHover={{ y: -8, scale: 1.02 }}
+                    className="relative p-8 rounded-2xl bg-background border-2 border-border/50 shadow-lg hover:shadow-xl hover:border-primary/30 transition-all duration-300 group"
+                  >
+                    <motion.div 
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      className="absolute -top-5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary to-purple-600 text-primary-foreground font-bold text-base py-2 px-5 rounded-full shadow-lg group-hover:shadow-primary/30 transition-shadow z-10"
+                    >
+                      {item.step}
+                    </motion.div>
+                    <h3 className="font-bold text-xl mt-6 mb-3 text-foreground group-hover:text-primary transition-colors">
+                      {item.title}
+                    </h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      {item.desc}
+                    </p>
+                    
+                    {/* Arrow between cards */}
+                    {i < t.steps.length - 1 && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.5 + i * 0.2, type: "spring", stiffness: 200 }}
+                        className={`hidden md:flex absolute top-1/2 ${language === "ar" ? "left-0 -translate-x-1/2" : "right-0 translate-x-1/2"} w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 via-purple-500/20 to-primary/20 border-2 border-primary/30 shadow-md items-center justify-center z-20`}
+                      >
+                        <ArrowRight className={`w-5 h-5 text-primary ${language === "ar" ? "rotate-180" : ""}`} />
+                      </motion.div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </div>
-        </section>
+        </motion.section>
 
-        {/* Visual Element */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1, delay: 0.4 }}
-          className="rounded-2xl overflow-hidden border-4 border-white/20 shadow-2xl mx-auto max-w-4xl bg-black"
+        {/* Stats Section */}
+        <motion.section
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="py-12"
         >
-           <div className="relative aspect-video">
-             <img src={generatedImage} alt="App interface preview" className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity duration-700" />
-             <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
-             <div className="absolute bottom-8 left-8 right-8 text-center">
-               <p className="text-white/90 text-lg font-medium">"LectureMate transformed how I study for finals. I saved 10+ hours per week."</p>
-               <p className="text-white/60 text-sm mt-2">— Sarah K., Medical Student</p>
-             </div>
-           </div>
-        </motion.div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            {[
+              { number: "10K+", label: language === "ar" ? "محاضرة معالجة" : "Lectures Processed" },
+              { number: "50K+", label: language === "ar" ? "سؤال منشأ" : "Questions Generated" },
+              { number: "95%", label: language === "ar" ? "دقة" : "Accuracy" },
+              { number: "24/7", label: language === "ar" ? "متاح دائماً" : "Always Available" },
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                whileHover={{ scale: 1.05 }}
+                className="text-center p-6 rounded-2xl bg-gradient-to-br from-card to-card/50 border border-border/50 shadow-lg hover:shadow-xl transition-all"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  whileInView={{ scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 + 0.2, type: "spring" }}
+                  className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2"
+                >
+                  {stat.number}
+                </motion.div>
+                <p className="text-sm text-muted-foreground font-medium">{stat.label}</p>
+              </motion.div>
+            ))}
+          </div>
+        </motion.section>
+
 
       </div>
     </AppLayout>
