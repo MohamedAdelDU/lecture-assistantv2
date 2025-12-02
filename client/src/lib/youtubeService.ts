@@ -87,16 +87,26 @@ export async function getYouTubeVideoInfo(
 
 // Extract transcript from YouTube using backend API endpoint
 export async function getYouTubeTranscript(
-  videoId: string
+  videoId: string,
+  startTime?: number | null,
+  endTime?: number | null
 ): Promise<string | null> {
   try {
     // Call backend API endpoint to fetch transcript (avoids CORS issues)
+    const requestBody: any = { videoId };
+    if (startTime !== undefined && startTime !== null) {
+      requestBody.startTime = startTime;
+    }
+    if (endTime !== undefined && endTime !== null) {
+      requestBody.endTime = endTime;
+    }
+
     const response = await fetch("/api/youtube/transcript", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ videoId }),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json().catch((err) => {

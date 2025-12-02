@@ -85,21 +85,31 @@ export async function registerRoutes(
    */
   app.post("/api/youtube/transcript", async (req: Request, res: Response) => {
     try {
-      const { videoId } = req.body;
+      const { videoId, startTime, endTime } = req.body;
 
       if (!videoId || typeof videoId !== "string") {
         return res.status(400).json({ error: "Video ID is required" });
       }
 
-      console.log(`[API] Fetching transcript for video: ${videoId}`);
+      const startTimeSeconds = startTime !== undefined && startTime !== null ? parseFloat(startTime) : null;
+      const endTimeSeconds = endTime !== undefined && endTime !== null ? parseFloat(endTime) : null;
+
+      console.log(`[API] Fetching transcript for video: ${videoId}${startTimeSeconds !== null ? ` (from ${startTimeSeconds}s)` : ''}${endTimeSeconds !== null ? ` (to ${endTimeSeconds}s)` : ''}`);
 
       try {
         console.log(`[API] Calling Python script to fetch transcript...`);
         const pythonScript = path.join(__dirname, "scripts", "get_transcript.py");
 
-        const { stdout, stderr } = await execAsync(
-          `python "${pythonScript}" "${videoId}"`,
-        );
+        // Build command with optional time parameters
+        let command = `python "${pythonScript}" "${videoId}"`;
+        if (startTimeSeconds !== null) {
+          command += ` "${startTimeSeconds}"`;
+        }
+        if (endTimeSeconds !== null) {
+          command += ` "${endTimeSeconds}"`;
+        }
+
+        const { stdout, stderr } = await execAsync(command);
 
         if (stderr) {
           console.error(`[API] Python stderr:`, stderr);
@@ -205,7 +215,7 @@ export async function registerRoutes(
 
           const model = genAI.getGenerativeModel({
 
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-flash",
 
           });
 
@@ -837,9 +847,9 @@ ${text}`;
 
       const genAI = new GoogleGenerativeAI(geminiApiKey);
       
-      // Use gemini-1.5-flash (most reliable and widely available)
+      // Use gemini-2.5-flash (most reliable and widely available)
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         generationConfig: {
           temperature: 0.3,
           topP: 0.9,
@@ -847,7 +857,7 @@ ${text}`;
         },
       });
       
-      console.log(`[API] Using Gemini model: gemini-1.5-flash for ${language} language`);
+      console.log(`[API] Using Gemini model: gemini-2.5-flash for ${language} language`);
 
       const prompt = language === "Arabic" 
         ? `أنت مصمم عروض تقديمية خبير متخصص في المحتوى التعليمي العربي. قم بإنشاء مجموعة شرائح احترافية ومنظمة من نص المحاضرة هذا.

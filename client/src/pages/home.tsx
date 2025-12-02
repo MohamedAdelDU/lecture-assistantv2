@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Youtube, Sparkles, Upload, Mic, Star, Cpu, Cloud } from "lucide-react";
+import { ArrowRight, Youtube, Sparkles, Upload, Mic, Star, Cpu, Cloud, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import { FeatureShowcase } from "@/components/home/FeatureShowcase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +25,11 @@ export default function Home() {
   const [processingLectureId, setProcessingLectureId] = useState<string | null>(null);
   const [isProcessingStopped, setIsProcessingStopped] = useState(false);
   const [selectedModel, setSelectedModel] = useState<"gpu" | "api">("api");
+  const [enableTimeRange, setEnableTimeRange] = useState(false);
+  const [startMinutes, setStartMinutes] = useState("");
+  const [startSeconds, setStartSeconds] = useState("");
+  const [endMinutes, setEndMinutes] = useState("");
+  const [endSeconds, setEndSeconds] = useState("");
   const { language } = useLanguage();
 
   const t = {
@@ -46,6 +51,12 @@ export default function Home() {
     uploadFile: language === "ar" ? "رفع ملف" : "Upload File",
     recordAudio: language === "ar" ? "تسجيل صوت" : "Record Audio",
     selectModel: language === "ar" ? "اختر الموديل" : "Select Model",
+    selectTimeRange: language === "ar" ? "اختر جزء محدد من الفيديو" : "Select specific video segment",
+    enableTimeRange: language === "ar" ? "تفعيل اختيار الوقت" : "Enable time selection",
+    startTime: language === "ar" ? "وقت البداية" : "Start Time",
+    endTime: language === "ar" ? "وقت النهاية" : "End Time",
+    minutes: language === "ar" ? "دقائق" : "min",
+    seconds: language === "ar" ? "ثواني" : "sec",
     modelGpu: language === "ar" ? "LM-Titan (GPU)" : "LM-Titan (GPU)",
     modelApi: language === "ar" ? "LM-Cloud (API)" : "LM-Cloud (API)",
     modelGpuDesc: language === "ar" ? "يعمل على الموديلات المحلية المعتمدة على GPU (Ollama)" : "Runs on local GPU-based models (Ollama)",
@@ -185,7 +196,34 @@ export default function Home() {
 
       // Get transcript
       console.log(`[Home] Fetching transcript for video: ${videoId}`);
-      const transcript = await getYouTubeTranscript(videoId);
+      
+      // Calculate time range in seconds if enabled
+      let startTimeSeconds: number | null = null;
+      let endTimeSeconds: number | null = null;
+      
+      if (enableTimeRange) {
+        // Parse time values - treat empty strings as 0
+        const startMin = startMinutes.trim() === "" ? 0 : (parseInt(startMinutes) || 0);
+        const startSec = startSeconds.trim() === "" ? 0 : (parseInt(startSeconds) || 0);
+        const endMin = endMinutes.trim() === "" ? 0 : (parseInt(endMinutes) || 0);
+        const endSec = endSeconds.trim() === "" ? 0 : (parseInt(endSeconds) || 0);
+        
+        startTimeSeconds = startMin * 60 + startSec;
+        endTimeSeconds = endMin * 60 + endSec;
+        
+        // Validate time range - end must be greater than start
+        // If both are 0 or end <= start, disable time filtering
+        if (endTimeSeconds > startTimeSeconds && endTimeSeconds > 0) {
+          console.log(`[Home] Using time range: ${startTimeSeconds}s - ${endTimeSeconds}s`);
+        } else {
+          // Invalid or empty range, disable it and use full transcript
+          console.log(`[Home] Time range invalid or empty (start: ${startTimeSeconds}s, end: ${endTimeSeconds}s), using full transcript`);
+          startTimeSeconds = null;
+          endTimeSeconds = null;
+        }
+      }
+      
+      const transcript = await getYouTubeTranscript(videoId, startTimeSeconds, endTimeSeconds);
       console.log(`[Home] Transcript received:`, {
         length: transcript?.length || 0,
         preview: transcript?.substring(0, 100) || "empty"
@@ -477,45 +515,175 @@ export default function Home() {
                     </motion.div>
                   </div>
                   
-                  {/* Model Selection */}
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.9 }}
-                    className={`flex items-center gap-3 px-2 ${language === "ar" ? "flex-row-reverse" : ""}`}
-                  >
-                    <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{t.selectModel}:</span>
-                    <div className={`flex gap-2 flex-1 ${language === "ar" ? "flex-row-reverse" : ""}`}>
-                      <motion.button
-                        type="button"
-                        onClick={() => setSelectedModel("gpu")}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                          selectedModel === "gpu"
-                            ? "bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-lg shadow-primary/30"
-                            : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
-                        }`}
+                  {/* Model Selection & Time Range */}
+                  <div className="space-y-3">
+                    {/* Model Selection */}
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.9 }}
+                      className={`flex items-center gap-3 px-2 ${language === "ar" ? "flex-row-reverse" : ""}`}
+                    >
+                      <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{t.selectModel}:</span>
+                      <div className={`flex gap-2 flex-1 ${language === "ar" ? "flex-row-reverse" : ""}`}>
+                        <motion.button
+                          type="button"
+                          onClick={() => setSelectedModel("gpu")}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                            selectedModel === "gpu"
+                              ? "bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-lg shadow-primary/30"
+                              : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
+                          }`}
+                        >
+                          <Cpu className="w-4 h-4" />
+                          <span>{t.modelGpu}</span>
+                        </motion.button>
+                        <motion.button
+                          type="button"
+                          onClick={() => setSelectedModel("api")}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                            selectedModel === "api"
+                              ? "bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-lg shadow-primary/30"
+                              : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
+                          }`}
+                        >
+                          <Cloud className="w-4 h-4" />
+                          <span>{t.modelApi}</span>
+                        </motion.button>
+                      </div>
+                      
+                      {/* Time Range Toggle */}
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 1 }}
+                        className={`flex items-center gap-2 ${language === "ar" ? "flex-row-reverse" : ""}`}
                       >
-                        <Cpu className="w-4 h-4" />
-                        <span>{t.modelGpu}</span>
-                      </motion.button>
-                      <motion.button
-                        type="button"
-                        onClick={() => setSelectedModel("api")}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                          selectedModel === "api"
-                            ? "bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-lg shadow-primary/30"
-                            : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
-                        }`}
-                      >
-                        <Cloud className="w-4 h-4" />
-                        <span>{t.modelApi}</span>
-                      </motion.button>
-                    </div>
-                  </motion.div>
+                        <motion.button
+                          type="button"
+                          onClick={() => setEnableTimeRange(!enableTimeRange)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                            enableTimeRange
+                              ? "bg-primary/10 text-primary border border-primary/30"
+                              : "bg-secondary/50 text-muted-foreground border border-border/50 hover:bg-secondary"
+                          }`}
+                        >
+                          <Clock className={`w-3.5 h-3.5 ${enableTimeRange ? "text-primary" : "text-muted-foreground"}`} />
+                          <span>{t.enableTimeRange}</span>
+                        </motion.button>
+                      </motion.div>
+                    </motion.div>
+                    
+                    {/* Time Range Inputs */}
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ 
+                        opacity: enableTimeRange ? 1 : 0,
+                        height: enableTimeRange ? "auto" : 0
+                      }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden"
+                    >
+                      {enableTimeRange && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 }}
+                          className={`grid grid-cols-2 gap-4 px-2 pt-2 ${language === "ar" ? "rtl" : "ltr"}`}
+                        >
+                        {/* Start Time */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-muted-foreground block">
+                            {t.startTime}
+                          </label>
+                          <div className={`flex gap-2 ${language === "ar" ? "flex-row-reverse" : ""}`}>
+                            <div className="flex-1">
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                min="0"
+                                value={startMinutes}
+                                onChange={(e) => setStartMinutes(e.target.value)}
+                                className="h-10 text-center"
+                                dir="ltr"
+                              />
+                              <span className="text-xs text-muted-foreground mt-1 block text-center">{t.minutes}</span>
+                            </div>
+                            <div className="flex items-center pt-6">
+                              <span className="text-muted-foreground">:</span>
+                            </div>
+                            <div className="flex-1">
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                min="0"
+                                max="59"
+                                value={startSeconds}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "" || (parseInt(val) >= 0 && parseInt(val) <= 59)) {
+                                    setStartSeconds(val);
+                                  }
+                                }}
+                                className="h-10 text-center"
+                                dir="ltr"
+                              />
+                              <span className="text-xs text-muted-foreground mt-1 block text-center">{t.seconds}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* End Time */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-muted-foreground block">
+                            {t.endTime}
+                          </label>
+                          <div className={`flex gap-2 ${language === "ar" ? "flex-row-reverse" : ""}`}>
+                            <div className="flex-1">
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                min="0"
+                                value={endMinutes}
+                                onChange={(e) => setEndMinutes(e.target.value)}
+                                className="h-10 text-center"
+                                dir="ltr"
+                              />
+                              <span className="text-xs text-muted-foreground mt-1 block text-center">{t.minutes}</span>
+                            </div>
+                            <div className="flex items-center pt-6">
+                              <span className="text-muted-foreground">:</span>
+                            </div>
+                            <div className="flex-1">
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                min="0"
+                                max="59"
+                                value={endSeconds}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "" || (parseInt(val) >= 0 && parseInt(val) <= 59)) {
+                                    setEndSeconds(val);
+                                  }
+                                }}
+                                className="h-10 text-center"
+                                dir="ltr"
+                              />
+                              <span className="text-xs text-muted-foreground mt-1 block text-center">{t.seconds}</span>
+                            </div>
+                          </div>
+                        </div>
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  </div>
                 </form>
               </CardContent>
             </Card>

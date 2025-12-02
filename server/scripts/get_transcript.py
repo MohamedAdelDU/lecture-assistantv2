@@ -15,8 +15,14 @@ def get_video_id(url):
         return match.group(1)
     return None
 
-def fetch_transcript(video_id):
-    """Fetch transcript from YouTube video"""
+def fetch_transcript(video_id, start_time=None, end_time=None):
+    """Fetch transcript from YouTube video
+    
+    Args:
+        video_id: YouTube video ID
+        start_time: Start time in seconds (optional)
+        end_time: End time in seconds (optional)
+    """
     try:
         # Use the same method as the working Python code
         ytt_api = YouTubeTranscriptApi()
@@ -25,7 +31,33 @@ def fetch_transcript(video_id):
         # Extract text: loop directly on transcript (iterable)
         full_text = ""
         for snippet in transcript:
-            full_text += snippet.text + " "
+            # snippet is an object with attributes: text, start, duration
+            snippet_start = snippet.start
+            snippet_duration = snippet.duration
+            snippet_end = snippet_start + snippet_duration
+            
+            # Filter by time range if specified
+            if start_time is not None and snippet_end < start_time:
+                continue
+            if end_time is not None and snippet_start > end_time:
+                continue
+            
+            # Include snippet if it overlaps with the time range
+            if start_time is None and end_time is None:
+                # No time filter, include all
+                full_text += snippet.text + " "
+            elif start_time is not None and end_time is not None:
+                # Both start and end specified
+                if snippet_start <= end_time and snippet_end >= start_time:
+                    full_text += snippet.text + " "
+            elif start_time is not None:
+                # Only start specified
+                if snippet_end >= start_time:
+                    full_text += snippet.text + " "
+            elif end_time is not None:
+                # Only end specified
+                if snippet_start <= end_time:
+                    full_text += snippet.text + " "
         
         # Clean up the text
         full_text = " ".join(full_text.split()).strip()
@@ -62,6 +94,27 @@ if __name__ == "__main__":
         sys.exit(1)
     
     video_id = sys.argv[1]
-    result = fetch_transcript(video_id)
+    
+    # Parse start_time - only if provided and not empty
+    start_time = None
+    if len(sys.argv) > 2 and sys.argv[2] and sys.argv[2].strip():
+        try:
+            start_time = float(sys.argv[2])
+            # If start_time is 0, treat it as valid (start from beginning)
+        except ValueError:
+            start_time = None
+    
+    # Parse end_time - only if provided and not empty
+    end_time = None
+    if len(sys.argv) > 3 and sys.argv[3] and sys.argv[3].strip():
+        try:
+            end_time = float(sys.argv[3])
+            # If end_time is 0, treat it as None (no end limit)
+            if end_time == 0:
+                end_time = None
+        except ValueError:
+            end_time = None
+    
+    result = fetch_transcript(video_id, start_time, end_time)
     print(json.dumps(result))
 
