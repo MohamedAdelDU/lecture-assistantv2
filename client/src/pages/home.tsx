@@ -31,10 +31,10 @@ export default function Home() {
   const [endMinutes, setEndMinutes] = useState("");
   const [endSeconds, setEndSeconds] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  // Auto-set device and model based on selectedModel
-  // When GPU mode is selected, automatically use GPU + large-v3
+  // Always use large-v3 for best quality
+  // Auto-set device based on selectedModel
   const selectedWhisperDevice: "cpu" | "gpu" = selectedModel === "gpu" ? "gpu" : "cpu";
-  const selectedWhisperModel: string = selectedModel === "gpu" ? "large-v3" : "base";
+  const selectedWhisperModel: string = "large-v3"; // Always use large-v3 for maximum quality
   const { language } = useLanguage();
 
   const t = {
@@ -72,17 +72,6 @@ export default function Home() {
     modelApiTooltip: language === "ar"
       ? "يستخدم Google Gemini API السحابي. لا يحتاج GPU، لكن يتطلب اتصال بالإنترنت وAPI key."
       : "Uses Google Gemini cloud API. No GPU needed, but requires internet connection and API key.",
-    selectWhisperDevice: language === "ar" ? "اختر الجهاز للتحويل الصوتي" : "Select Device for Transcription",
-    whisperCpu: language === "ar" ? "CPU" : "CPU",
-    whisperGpu: language === "ar" ? "GPU" : "GPU",
-    whisperCpuDesc: language === "ar" ? "يعمل على المعالج (أبطأ لكن متاح دائماً)" : "Runs on CPU (slower but always available)",
-    whisperGpuDesc: language === "ar" ? "يعمل على بطاقة الرسوميات (أسرع بكثير)" : "Runs on GPU (much faster)",
-    selectWhisperModel: language === "ar" ? "اختر حجم الموديل" : "Select Model Size",
-    whisperModelTiny: language === "ar" ? "Tiny (أسرع)" : "Tiny (fastest)",
-    whisperModelBase: language === "ar" ? "Base (متوازن)" : "Base (balanced)",
-    whisperModelSmall: language === "ar" ? "Small (جيد)" : "Small (good)",
-    whisperModelMedium: language === "ar" ? "Medium (أفضل)" : "Medium (better)",
-    whisperModelLarge: language === "ar" ? "Large-v3 (الأفضل)" : "Large-v3 (best)",
     howItWorksTitle: language === "ar" ? "كيف يعمل؟" : "How It Works",
     howItWorksSubtitle:
       language === "ar"
@@ -917,44 +906,6 @@ export default function Home() {
                         </div>
                       </motion.div>
                     )}
-                    
-                    {/* Whisper Model Selection (shown when file is uploaded) */}
-                    {uploadedFile && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: 0.1 }}
-                        className={`flex flex-col gap-2 px-2 ${language === "ar" ? "rtl" : "ltr"}`}
-                      >
-                        <span className="text-xs font-semibold text-muted-foreground">{t.selectWhisperModel}:</span>
-                        <div className={`grid grid-cols-5 gap-2 ${language === "ar" ? "flex-row-reverse" : ""}`}>
-                          {[
-                            { value: "tiny", label: t.whisperModelTiny },
-                            { value: "base", label: t.whisperModelBase },
-                            { value: "small", label: t.whisperModelSmall },
-                            { value: "medium", label: t.whisperModelMedium },
-                            { value: "large-v3", label: t.whisperModelLarge },
-                          ].map((model) => (
-                            <motion.button
-                              key={model.value}
-                              type="button"
-                              onClick={() => setSelectedWhisperModel(model.value)}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                                selectedWhisperModel === model.value
-                                  ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/30"
-                                  : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
-                              }`}
-                              title={model.label}
-                            >
-                              <span className="truncate block">{model.value === "large-v3" ? "Large-v3" : model.value.charAt(0).toUpperCase() + model.value.slice(1)}</span>
-                            </motion.button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                    
                     {/* Time Range Inputs */}
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
