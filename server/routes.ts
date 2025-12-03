@@ -276,6 +276,52 @@ export async function registerRoutes(
     req.setTimeout(600000); // 10 minutes timeout
     res.setTimeout(600000); // 10 minutes timeout
     
+    // Start keep-alive mechanism to prevent proxy timeout
+    // Send headers immediately with chunked encoding
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Transfer-Encoding': 'chunked',
+      'Connection': 'keep-alive',
+      'Cache-Control': 'no-cache',
+    });
+    
+    // Send periodic keep-alive heartbeats every 15 seconds
+    let keepAliveInterval: NodeJS.Timeout | null = null;
+    const startKeepAlive = () => {
+      keepAliveInterval = setInterval(() => {
+        if (!res.writableEnded && res.writable && !res.headersSent) {
+          // Headers already sent, just send a heartbeat
+          try {
+            res.write(' '); // Send space to keep connection alive
+          } catch (e) {
+            // Connection closed, stop keep-alive
+            if (keepAliveInterval) {
+              clearInterval(keepAliveInterval);
+              keepAliveInterval = null;
+            }
+          }
+        } else if (res.writableEnded || !res.writable) {
+          // Response finished, stop keep-alive
+          if (keepAliveInterval) {
+            clearInterval(keepAliveInterval);
+            keepAliveInterval = null;
+          }
+        }
+      }, 15000); // Every 15 seconds
+    };
+    
+    startKeepAlive();
+    
+    // Clean up interval on finish or error
+    const cleanup = () => {
+      if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+        keepAliveInterval = null;
+      }
+    };
+    res.on('finish', cleanup);
+    res.on('close', cleanup);
+    
     try {
       const { videoId, startTime, endTime, modelSize = "large-v3", language, device = "cuda" } = req.body;
 
@@ -405,25 +451,35 @@ export async function registerRoutes(
           `[API] Successfully transcribed YouTube audio (${transcript.length} characters, ${transcribeResult.wordCount} words, language: ${transcribeResult.language})`,
         );
 
+        // Stop keep-alive before sending final response
+        cleanup();
+        
         // Check if response already sent to avoid double response
-        if (res.headersSent) {
-          console.warn("[API] Response already sent, skipping duplicate response");
+        if (res.writableEnded || !res.writable) {
+          console.warn("[API] Response already ended, skipping duplicate response");
           return;
         }
         
-        res.json({
+        // Send final response as JSON
+        const responseData = JSON.stringify({
           transcript,
           wordCount: transcribeResult.wordCount,
           characterCount: transcribeResult.characterCount || transcript.length,
           language: transcribeResult.language,
           audioUrl: audioUrl || undefined, // Include Firebase Storage URL if available
         });
+        
+        res.write(responseData);
+        res.end();
       } catch (pythonError: any) {
         console.error("[API] Error in YouTube transcription:", pythonError);
 
+        // Stop keep-alive
+        cleanup();
+
         // Check if response already sent
-        if (res.headersSent) {
-          console.warn("[API] Response already sent, skipping error response");
+        if (res.writableEnded || !res.writable) {
+          console.warn("[API] Response already ended, skipping error response");
           return;
         }
 
@@ -434,21 +490,29 @@ export async function registerRoutes(
           errorMessage = "Python 'faster-whisper' not installed. Please run 'pip install faster-whisper'.";
         }
 
-        res.status(500).json({
+        const errorResponse = JSON.stringify({
           error: errorMessage,
           details: pythonError.message,
         });
+        
+        res.write(errorResponse);
+        res.end();
       }
     } catch (error: any) {
       console.error("[API] Error in YouTube transcription endpoint:", error);
       
+      // Stop keep-alive
+      cleanup();
+      
       // Check if response already sent
-      if (res.headersSent) {
-        console.warn("[API] Response already sent, skipping error response");
+      if (res.writableEnded || !res.writable) {
+        console.warn("[API] Response already ended, skipping error response");
         return;
       }
       
-      res.status(500).json({ error: "Failed to transcribe YouTube audio" });
+      const errorResponse = JSON.stringify({ error: "Failed to transcribe YouTube audio" });
+      res.write(errorResponse);
+      res.end();
     } finally {
       // Clean up downloaded file
       if (downloadedFilePath && existsSync(downloadedFilePath)) {
