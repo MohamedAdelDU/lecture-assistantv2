@@ -4,30 +4,15 @@ import { rm, readFile } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
+// Note: Removed multer and some others that use dynamic require() which doesn't work with ESM
 const allowlist = [
   "@google/generative-ai",
   "@neondatabase/serverless",
   "axios",
-  "connect-pg-simple",
   "cors",
   "date-fns",
-  "drizzle-orm",
-  "drizzle-zod",
-  "express",
-  "express-rate-limit",
-  "express-session",
-  "jsonwebtoken",
-  "memorystore",
-  "multer",
   "nanoid",
-  "nodemailer",
-  "openai",
-  "passport",
-  "passport-local",
-  "stripe",
   "uuid",
-  "ws",
-  "xlsx",
   "zod",
   "zod-validation-error",
 ];
