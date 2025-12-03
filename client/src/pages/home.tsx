@@ -420,6 +420,42 @@ export default function Home() {
         return;
       }
 
+      // Ensure video info is saved (in case it wasn't saved during creation)
+      if (videoInfo && (videoInfo.title || videoInfo.duration || videoInfo.thumbnailUrl)) {
+        await updateLecture({ 
+          lectureId, 
+          updates: { 
+            title: videoInfo.title || `YouTube Video ${videoId}`,
+            duration: videoInfo.duration || "0:00",
+            thumbnailUrl: videoInfo.thumbnailUrl || getYouTubeThumbnail(videoId),
+            progress: 10 
+          } 
+        });
+      } else {
+        // If videoInfo is missing, try to fetch it again
+        try {
+          const fetchedInfo = await getYouTubeVideoInfo(videoId);
+          if (fetchedInfo) {
+            await updateLecture({ 
+              lectureId, 
+              updates: { 
+                title: fetchedInfo.title,
+                duration: fetchedInfo.duration,
+                thumbnailUrl: fetchedInfo.thumbnailUrl,
+                progress: 10 
+              } 
+            });
+          }
+        } catch (err) {
+          console.warn("[Home] Failed to fetch video info:", err);
+        }
+      }
+
+      // Check again after update
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
       // Update progress
       await updateLecture({ lectureId, updates: { progress: 20 } });
       
