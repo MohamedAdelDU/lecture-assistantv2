@@ -5,6 +5,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { startModelServer, stopModelServer } from "./modelServer";
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,6 +64,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Start model server in background (loads models once and keeps them in memory)
+  if (process.env.NODE_ENV === "production" || process.env.START_MODEL_SERVER !== "false") {
+    try {
+      await startModelServer();
+      console.log("[Server] Model server started - models will be loaded on first request");
+    } catch (error) {
+      console.error("[Server] Failed to start model server, will use direct scripts:", error);
+    }
+  }
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -96,4 +107,23 @@ app.use((req, res, next) => {
       log(`serving on ${host}:${port}`);
     },
   );
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('[Server] SIGTERM received, shutting down gracefully');
+    stopModelServer();
+    httpServer.close(() => {
+      console.log('[Server] HTTP server closed');
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    console.log('[Server] SIGINT received, shutting down gracefully');
+    stopModelServer();
+    httpServer.close(() => {
+      console.log('[Server] HTTP server closed');
+      process.exit(0);
+    });
+  });
 })();
