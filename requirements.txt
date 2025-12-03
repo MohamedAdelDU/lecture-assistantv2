@@ -1,0 +1,8 @@
+youtube-transcript-api>=0.6.0
+faster-whisper>=1.0.0
+yt-dlp>=2024.0.0
+
+# Optional: For GPU detection and better performance on RunPod
+# Install PyTorch with CUDA support:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
