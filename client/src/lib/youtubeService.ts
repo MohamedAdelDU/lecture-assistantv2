@@ -244,14 +244,30 @@ export async function transcribeYouTubeWithWhisper(
     }
 
     // Call backend API endpoint to download and transcribe
-    const response = await fetch("/api/youtube/transcribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
-
+    // Use AbortController with longer timeout for long-running transcription
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
+    
+    let response: Response;
+    try {
+      response = await fetch("/api/youtube/transcribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error("Request timeout: Transcription is taking too long. Please try again or use a shorter video.");
+      }
+      throw fetchError;
+    }
+    
     const data = await response.json().catch((err) => {
       console.error("[youtubeService] Failed to parse JSON response:", err);
       return {};

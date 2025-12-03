@@ -27,7 +27,14 @@ if (typeof window !== "undefined") {
 
 // Initialize Firebase Auth
 const auth = getAuth(app);
+
+// Configure Google Auth Provider with additional scopes
 const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('profile');
+googleProvider.addScope('email');
+googleProvider.setCustomParameters({
+  prompt: 'select_account' // Force account selection
+});
 
 // Initialize Firestore
 const db = getFirestore(app);

@@ -18,6 +18,15 @@ interface QuizViewProps {
 export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
+  
+  // Detect content language from questions
+  const detectContentLanguage = questions.length > 0 && /[\u0600-\u06FF]/.test(
+    questions.map(q => q.text + q.options.join(" ")).join(" ")
+  ) ? "ar" : "en";
+  
+  // Use detected content language for display direction
+  const displayDir = detectContentLanguage === "ar" ? "rtl" : "ltr";
+  const displayTextAlign = detectContentLanguage === "ar" ? "right" : "left";
 
   const t = {
     complete: language === "ar" ? "اكتمل الاختبار!" : "Quiz Complete!",
@@ -525,17 +534,17 @@ export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
   // Review mode - show all questions with user answers vs correct answers
   if (quizMode === "review") {
     return (
-      <div className="max-w-4xl mx-auto mt-8 space-y-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
+      <div className="max-w-4xl mx-auto mt-8 space-y-6" dir={displayDir}>
+        <div className={cn("flex items-center justify-between mb-6", displayDir === "rtl" ? "flex-row-reverse" : "")}>
+          <div style={{ textAlign: displayTextAlign }}>
             <h2 className="text-2xl font-bold">{t.reviewAnswers}</h2>
             <p className="text-muted-foreground mt-1">
               {t.scored} <span className="font-bold">{score}</span> {t.outOf} <span className="font-bold">{questions.length}</span>
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className={cn("flex gap-2", displayDir === "rtl" ? "flex-row-reverse" : "")}>
             <Button onClick={handleExportPDF} variant="outline">
-              <Download className={`w-4 h-4 ${language === "ar" ? "ml-2" : "mr-2"}`} />
+              <Download className={cn("w-4 h-4", displayDir === "rtl" ? "ml-2" : "mr-2")} />
               {t.exportPDF}
             </Button>
             <Button onClick={() => setQuizMode("menu")} variant="outline">
@@ -549,11 +558,11 @@ export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
           const isCorrect = userAnswer === q.correctIndex;
           
           return (
-            <Card key={qIndex} className="border-2">
+            <Card key={qIndex} className="border-2" dir={displayDir}>
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className={cn("text-lg flex items-center gap-2", displayDir === "rtl" ? "flex-row-reverse" : "")} style={{ textAlign: displayTextAlign }}>
                   <span className="text-primary font-bold">{qIndex + 1}.</span>
-                  {q.text}
+                  <span className="flex-1">{q.text}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -570,15 +579,25 @@ export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
                     optionStyle += " border opacity-50";
                   }
                   
+                  const optionLabel = detectContentLanguage === "ar" 
+                    ? String.fromCharCode(1570 + optIndex) // أ، ب، ج، د
+                    : String.fromCharCode(65 + optIndex); // A, B, C, D
+                  
                   return (
-                    <div key={optIndex} className={cn(optionStyle, "flex items-center justify-between")}>
-                      <span className="flex-1">
-                        <span className="font-medium mr-2">{String.fromCharCode(65 + optIndex)}.</span>
+                    <div key={optIndex} className={cn(
+                      optionStyle, 
+                      "flex items-center justify-between",
+                      displayDir === "rtl" ? "flex-row-reverse" : ""
+                    )} dir={displayDir}>
+                      <span className="flex-1" style={{ textAlign: displayTextAlign }}>
+                        <span className={cn("font-medium", displayDir === "rtl" ? "ml-2" : "mr-2")}>
+                          {optionLabel}.
+                        </span>
                         {option}
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className={cn("flex items-center gap-2", displayDir === "rtl" ? "flex-row-reverse" : "")}>
                         {isCorrectOption && (
-                          <div className="flex items-center gap-1 text-green-600 text-sm font-medium">
+                          <div className={cn("flex items-center gap-1 text-green-600 text-sm font-medium", displayDir === "rtl" ? "flex-row-reverse" : "")}>
                             <CheckCircle className="w-4 h-4" />
                             <span>{t.correctAnswer}</span>
                           </div>
@@ -586,6 +605,7 @@ export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
                         {isUserOption && (
                           <div className={cn(
                             "flex items-center gap-1 text-sm font-medium",
+                            displayDir === "rtl" ? "flex-row-reverse" : "",
                             isCorrect ? "text-green-600" : "text-red-600"
                           )}>
                             {isCorrect ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
@@ -609,25 +629,25 @@ export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
     if (!currentQuestion) return <div>{t.noQuestions}</div>;
 
     return (
-    <div className="max-w-2xl mx-auto mt-8">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
+    <div className="max-w-2xl mx-auto mt-8" dir={displayDir}>
+      <div className={cn("flex justify-between items-center mb-6", displayDir === "rtl" ? "flex-row-reverse" : "")}>
+        <div className={cn("flex items-center gap-4", displayDir === "rtl" ? "flex-row-reverse" : "")}>
           <Button onClick={() => setQuizMode("menu")} variant="ghost" size="sm">
-            <ArrowRight className={`w-4 h-4 ${language === "ar" ? "ml-1 rotate-180" : "mr-1"}`} />
+            <ArrowRight className={cn("w-4 h-4", displayDir === "rtl" ? "ml-1 rotate-180" : "mr-1")} />
             {t.backToMenu}
           </Button>
-          <div className="text-sm font-medium text-muted-foreground">
+          <div className="text-sm font-medium text-muted-foreground" style={{ textAlign: displayTextAlign }}>
             <span>{t.question} {currentQuestionIndex + 1} {t.outOf} {questions.length}</span>
           </div>
         </div>
-        <div className="text-sm font-medium text-muted-foreground">
+        <div className="text-sm font-medium text-muted-foreground" style={{ textAlign: displayTextAlign }}>
           <span>{t.score}: {score}</span>
         </div>
       </div>
 
-      <Card className="border-2">
+      <Card className="border-2" dir={displayDir}>
         <CardHeader>
-          <CardTitle className="text-xl leading-relaxed">
+          <CardTitle className="text-xl leading-relaxed" style={{ textAlign: displayTextAlign }}>
             {currentQuestion.text}
           </CardTitle>
         </CardHeader>
@@ -647,16 +667,27 @@ export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
               optionStyle = "border-primary bg-primary/5 ring-1 ring-primary";
             }
 
+            const optionLabel = detectContentLanguage === "ar" 
+              ? String.fromCharCode(1570 + index) // أ، ب، ج، د
+              : String.fromCharCode(65 + index); // A, B, C, D
+
             return (
               <div
                 key={index}
                 onClick={() => handleOptionSelect(index)}
                 className={cn(
                   "p-4 rounded-lg transition-all duration-200 flex items-center justify-between",
+                  displayDir === "rtl" ? "flex-row-reverse" : "",
                   optionStyle
                 )}
+                dir={displayDir}
               >
-                <span>{option}</span>
+                <span className="flex-1" style={{ textAlign: displayTextAlign }}>
+                  <span className={cn("font-medium", displayDir === "rtl" ? "ml-2" : "mr-2")}>
+                    {optionLabel}.
+                  </span>
+                  {option}
+                </span>
                 {isAnswered && index === currentQuestion.correctIndex && (
                   <CheckCircle className="w-5 h-5 text-green-600" />
                 )}
@@ -667,7 +698,7 @@ export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
             );
           })}
         </CardContent>
-        <CardFooter className="justify-end pt-6">
+        <CardFooter className={cn("pt-6", displayDir === "rtl" ? "justify-start" : "justify-end")}>
           {!isAnswered ? (
             <Button onClick={handleSubmit} disabled={selectedOption === null}>
               {t.checkAnswer}
@@ -675,7 +706,7 @@ export function QuizView({ questions, title = "Quiz" }: QuizViewProps) {
           ) : (
             <Button onClick={handleNext}>
               {currentQuestionIndex === questions.length - 1 ? t.finishQuiz : t.nextQuestion}
-              <ArrowRight className={`w-4 h-4 ${language === "ar" ? "mr-2" : "ml-2"}`} />
+              <ArrowRight className={cn("w-4 h-4", displayDir === "rtl" ? "mr-2" : "ml-2")} />
             </Button>
           )}
         </CardFooter>

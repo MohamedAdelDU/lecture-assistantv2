@@ -60,23 +60,26 @@ def generate_quiz(transcript, device="cuda"):
         has_arabic = any('\u0600' <= char <= '\u06FF' for char in transcript)
         language = "Arabic" if has_arabic else "English"
         
-        # Create prompt based on language
+        # Create enhanced prompt based on language (matching Gemini API quality)
         if has_arabic:
             prompt = f"""أنت خبير في إنشاء الاختبارات التعليمية. قم بإنشاء 5-10 أسئلة اختيار من متعدد عالية الجودة بناءً على نص المحاضرة التالي.
 
 المتطلبات الحرجة:
-- النص بالعربية. يجب أن تكتب جميع الأسئلة والخيارات بالعربية. لا تترجم.
-- أنشئ 5-10 أسئلة تختبر فهم المفاهيم الرئيسية والحقائق المهمة والأفكار الرئيسية من النص.
+- النص بالعربية. يجب أن تكتب جميع الأسئلة والخيارات والإجابات بالعربية. لا تترجم أبداً.
+- أنشئ 5-10 أسئلة تختبر فهم المفاهيم الرئيسية والحقائق المهمة والأفكار الأساسية من النص.
 - كل سؤال يجب أن يحتوي على 4 خيارات بالضبط (أ، ب، ج، د).
-- حدد الإجابة الصحيحة بوضوح.
-- يجب أن تكون الأسئلة واضحة ومحددة وتختبر الفهم الفعلي (وليس فقط الحفظ).
-- أعد فقط JSON صالح بهذا الشكل بالضبط (بدون markdown، بدون كتل كود، بدون نص إضافي):
+- حدد الإجابة الصحيحة بوضوح في correctIndex (0-3).
+- يجب أن تكون الأسئلة واضحة ومحددة وتختبر الفهم الفعلي والتحليل (وليس فقط الحفظ).
+- الأسئلة يجب أن تغطي مختلف أجزاء المحاضرة بشكل متوازن.
+- استخدم لغة واضحة ومهنية مناسبة للطلاب.
+- أعد فقط JSON صالح بهذا الشكل بالضبط (بدون markdown، بدون كتل كود، بدون نص إضافي، بدون شرح):
+
 {{
   "questions": [
     {{
       "id": 1,
-      "text": "نص السؤال هنا؟",
-      "options": ["الخيار أ", "الخيار ب", "الخيار ج", "الخيار د"],
+      "text": "نص السؤال الواضح والمحدد هنا؟",
+      "options": ["الخيار أ (صحيح)", "الخيار ب", "الخيار ج", "الخيار د"],
       "correctIndex": 0,
       "type": "multiple-choice"
     }}
@@ -91,18 +94,21 @@ JSON:"""
             prompt = f"""You are an expert educational quiz generator. Create 5-10 high-quality multiple-choice quiz questions based on the following lecture transcript.
 
 CRITICAL REQUIREMENTS:
-- The transcript is in {language}. You MUST write ALL questions, options, and explanations in {language}. Do NOT translate.
+- The transcript is in {language}. You MUST write ALL questions, options, and answers in {language}. Do NOT translate.
 - Generate 5-10 questions that test understanding of key concepts, important facts, and main ideas from the transcript.
 - Each question must have exactly 4 options (A, B, C, D).
-- Mark the correct answer clearly.
-- Questions should be clear, specific, and test actual understanding (not just memorization).
-- Return ONLY valid JSON in this exact format (no markdown, no code blocks, no extra text):
+- Mark the correct answer clearly in correctIndex (0-3).
+- Questions should be clear, specific, and test actual understanding and analysis (not just memorization).
+- Questions should cover different parts of the lecture in a balanced way.
+- Use clear, professional language appropriate for students.
+- Return ONLY valid JSON in this exact format (no markdown, no code blocks, no extra text, no explanation):
+
 {{
   "questions": [
     {{
       "id": 1,
-      "text": "Question text here?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "text": "Clear and specific question text here?",
+      "options": ["Option A (correct)", "Option B", "Option C", "Option D"],
       "correctIndex": 0,
       "type": "multiple-choice"
     }}

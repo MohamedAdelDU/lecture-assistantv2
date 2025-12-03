@@ -60,25 +60,33 @@ def generate_flashcards(transcript, device="cuda"):
         has_arabic = any('\u0600' <= char <= '\u06FF' for char in transcript)
         language = "Arabic" if has_arabic else "English"
         
-        # Create prompt based on language
+        # Create enhanced prompt based on language (matching Gemini API quality)
         if has_arabic:
             prompt = f"""أنت خبير في إنشاء البطاقات التعليمية. قم بإنشاء 8-15 بطاقة تعليمية عالية الجودة بناءً على نص المحاضرة التالي.
 
 المتطلبات الحرجة:
-- النص بالعربية. يجب أن تكتب جميع المصطلحات والتعريفات بالعربية. لا تترجم.
+- النص بالعربية. يجب أن تكتب جميع المصطلحات والتعريفات بالعربية. لا تترجم أبداً.
 - أنشئ 8-15 بطاقة تعليمية تغطي أهم المصطلحات والمفاهيم والأفكار الرئيسية من النص.
 - كل بطاقة يجب أن تحتوي على:
-  * مصطلح أو مفهوم واضح (Term)
-  * تعريف أو شرح مفصل (Definition)
-- ركز على المصطلحات التقنية والمفاهيم الأساسية والأفكار المهمة.
-- التعريفات يجب أن تكون واضحة ومفيدة للطلاب.
+  * مصطلح أو مفهوم واضح ومحدد (Term) - يجب أن يكون قصيراً وواضحاً
+  * تعريف أو شرح مفصل ومفيد (Definition) - يجب أن يكون شاملاً وواضحاً
+- ركز على:
+  * المصطلحات التقنية والمفاهيم الأساسية
+  * التعريفات المهمة والأفكار الرئيسية
+  * المفاهيم التي تحتاج إلى حفظ أو فهم عميق
+- التعريفات يجب أن تكون:
+  * واضحة ومفهومة للطلاب
+  * شاملة وتغطي الجوانب المهمة
+  * مفيدة للمراجعة والدراسة
+- استخدم لغة مهنية وواضحة.
 - أعد فقط JSON صالح بهذا الشكل بالضبط (بدون markdown، بدون كتل كود، بدون نص إضافي):
+
 {{
   "flashcards": [
     {{
       "id": 1,
-      "term": "المصطلح أو المفهوم",
-      "definition": "التعريف أو الشرح المفصل"
+      "term": "المصطلح أو المفهوم الواضح",
+      "definition": "التعريف أو الشرح المفصل والشامل الذي يساعد الطلاب على الفهم"
     }}
   ]
 }}
@@ -94,17 +102,25 @@ CRITICAL REQUIREMENTS:
 - The transcript is in {language}. You MUST write ALL terms and definitions in {language}. Do NOT translate.
 - Generate 8-15 flashcards covering the most important terms, concepts, and key ideas from the transcript.
 - Each flashcard must contain:
-  * A clear term or concept (Term)
-  * A detailed definition or explanation (Definition)
-- Focus on technical terms, fundamental concepts, and important ideas.
-- Definitions should be clear and useful for students.
+  * A clear and specific term or concept (Term) - should be short and clear
+  * A detailed and useful definition or explanation (Definition) - should be comprehensive and clear
+- Focus on:
+  * Technical terms and fundamental concepts
+  * Important definitions and key ideas
+  * Concepts that need memorization or deep understanding
+- Definitions should be:
+  * Clear and understandable for students
+  * Comprehensive and cover important aspects
+  * Useful for review and study
+- Use clear, professional language.
 - Return ONLY valid JSON in this exact format (no markdown, no code blocks, no extra text):
+
 {{
   "flashcards": [
     {{
       "id": 1,
-      "term": "Term or Concept",
-      "definition": "Detailed definition or explanation"
+      "term": "Clear Term or Concept",
+      "definition": "Detailed and comprehensive definition or explanation that helps students understand"
     }}
   ]
 }}

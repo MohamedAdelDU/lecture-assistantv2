@@ -259,6 +259,58 @@ export async function registerRoutes(
     // Get userId from request body or auth (if available)
     const userId = req.body.userId || (req as any).user?.uid || "anonymous";
     
+    // Set longer timeout and keep-alive headers to prevent proxy timeout
+    req.setTimeout(600000); // 10 minutes timeout
+    res.setTimeout(600000); // 10 minutes timeout
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Keep-Alive', 'timeout=600, max=1000');
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    // Send periodic keep-alive chunks to prevent proxy timeout (chunked transfer encoding)
+    let keepAliveInterval: NodeJS.Timeout | null = null;
+    const startKeepAlive = () => {
+      if (!res.headersSent) {
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Transfer-Encoding': 'chunked',
+          'Connection': 'keep-alive',
+          'Keep-Alive': 'timeout=600, max=1000',
+        });
+      }
+      
+      keepAliveInterval = setInterval(() => {
+        if (!res.writableEnded && res.writable) {
+          try {
+            res.write('\n'); // Send newline to keep connection alive
+          } catch (e) {
+            // Connection closed, stop keep-alive
+            if (keepAliveInterval) {
+              clearInterval(keepAliveInterval);
+              keepAliveInterval = null;
+            }
+          }
+        } else {
+          if (keepAliveInterval) {
+            clearInterval(keepAliveInterval);
+            keepAliveInterval = null;
+          }
+        }
+      }, 20000); // Every 20 seconds
+    };
+    
+    // Start keep-alive after a short delay
+    setTimeout(startKeepAlive, 5000);
+    
+    // Clean up interval on finish or error
+    const cleanup = () => {
+      if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+        keepAliveInterval = null;
+      }
+    };
+    res.on('finish', cleanup);
+    res.on('close', cleanup);
+    
     try {
       const { videoId, startTime, endTime, modelSize = "large-v3", language, device = "cuda" } = req.body;
 
@@ -381,6 +433,9 @@ export async function registerRoutes(
           `[API] Successfully transcribed YouTube audio (${transcript.length} characters, ${transcribeResult.wordCount} words, language: ${transcribeResult.language})`,
         );
 
+        // Stop keep-alive before sending final response
+        cleanup();
+        
         res.json({
           transcript,
           wordCount: transcribeResult.wordCount,
@@ -895,21 +950,51 @@ ${transcript.substring(0, 20000)}`,
           const hasArabic = /[\u0600-\u06FF]/.test(transcript);
           const language = hasArabic ? "Arabic" : "English";
 
-          const prompt = `You are an expert educational quiz generator. Create 5-10 high-quality multiple-choice quiz questions based on the following lecture transcript.
+          const prompt = hasArabic
+            ? `أنت خبير في إنشاء الاختبارات التعليمية. قم بإنشاء 5-10 أسئلة اختيار من متعدد عالية الجودة بناءً على نص المحاضرة التالي.
 
-CRITICAL REQUIREMENTS:
-- The transcript is in ${language}. You MUST write ALL questions, options, and explanations in ${language}. Do NOT translate.
-- Generate 5-10 questions that test understanding of key concepts, important facts, and main ideas from the transcript.
-- Each question must have exactly 4 options (A, B, C, D).
-- Mark the correct answer clearly.
-- Questions should be clear, specific, and test actual understanding (not just memorization).
-- Return ONLY valid JSON in this exact format (no markdown, no code blocks, no extra text):
+المتطلبات الحرجة:
+- النص بالعربية. يجب أن تكتب جميع الأسئلة والخيارات والإجابات بالعربية. لا تترجم أبداً.
+- أنشئ 5-10 أسئلة تختبر فهم المفاهيم الرئيسية والحقائق المهمة والأفكار الأساسية من النص.
+- كل سؤال يجب أن يحتوي على 4 خيارات بالضبط (أ، ب، ج، د).
+- حدد الإجابة الصحيحة بوضوح في correctIndex (0-3).
+- يجب أن تكون الأسئلة واضحة ومحددة وتختبر الفهم الفعلي والتحليل (وليس فقط الحفظ).
+- الأسئلة يجب أن تغطي مختلف أجزاء المحاضرة بشكل متوازن.
+- استخدم لغة واضحة ومهنية مناسبة للطلاب.
+- أعد فقط JSON صالح بهذا الشكل بالضبط (بدون markdown، بدون كتل كود، بدون نص إضافي):
+
 {
   "questions": [
     {
       "id": 1,
-      "text": "Question text here?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "text": "نص السؤال الواضح والمحدد هنا؟",
+      "options": ["الخيار أ (صحيح)", "الخيار ب", "الخيار ج", "الخيار د"],
+      "correctIndex": 0,
+      "type": "multiple-choice"
+    }
+  ]
+}
+
+نص المحاضرة:
+${transcript.substring(0, 30000)}`
+            : `You are an expert educational quiz generator. Create 5-10 high-quality multiple-choice quiz questions based on the following lecture transcript.
+
+CRITICAL REQUIREMENTS:
+- The transcript is in ${language}. You MUST write ALL questions, options, and answers in ${language}. Do NOT translate.
+- Generate 5-10 questions that test understanding of key concepts, important facts, and main ideas from the transcript.
+- Each question must have exactly 4 options (A, B, C, D).
+- Mark the correct answer clearly in correctIndex (0-3).
+- Questions should be clear, specific, and test actual understanding and analysis (not just memorization).
+- Questions should cover different parts of the lecture in a balanced way.
+- Use clear, professional language appropriate for students.
+- Return ONLY valid JSON in this exact format (no markdown, no code blocks, no extra text):
+
+{
+  "questions": [
+    {
+      "id": 1,
+      "text": "Clear and specific question text here?",
+      "options": ["Option A (correct)", "Option B", "Option C", "Option D"],
       "correctIndex": 0,
       "type": "multiple-choice"
     }
@@ -1081,23 +1166,63 @@ ${transcript.substring(0, 30000)}`;
           const hasArabic = /[\u0600-\u06FF]/.test(transcript);
           const language = hasArabic ? "Arabic" : "English";
 
-          const prompt = `You are an expert flashcard creator. Create 8-15 high-quality flashcards based on the following lecture transcript.
+          const prompt = hasArabic
+            ? `أنت خبير في إنشاء البطاقات التعليمية. قم بإنشاء 8-15 بطاقة تعليمية عالية الجودة بناءً على نص المحاضرة التالي.
+
+المتطلبات الحرجة:
+- النص بالعربية. يجب أن تكتب جميع المصطلحات والتعريفات بالعربية. لا تترجم أبداً.
+- أنشئ 8-15 بطاقة تعليمية تغطي أهم المصطلحات والمفاهيم والأفكار الرئيسية من النص.
+- كل بطاقة يجب أن تحتوي على:
+  * مصطلح أو مفهوم واضح ومحدد (Term) - يجب أن يكون قصيراً وواضحاً
+  * تعريف أو شرح مفصل ومفيد (Definition) - يجب أن يكون شاملاً وواضحاً
+- ركز على:
+  * المصطلحات التقنية والمفاهيم الأساسية
+  * التعريفات المهمة والأفكار الرئيسية
+  * المفاهيم التي تحتاج إلى حفظ أو فهم عميق
+- التعريفات يجب أن تكون:
+  * واضحة ومفهومة للطلاب
+  * شاملة وتغطي الجوانب المهمة
+  * مفيدة للمراجعة والدراسة
+- استخدم لغة مهنية وواضحة.
+- أعد فقط JSON صالح بهذا الشكل بالضبط (بدون markdown، بدون كتل كود، بدون نص إضافي):
+
+{
+  "flashcards": [
+    {
+      "id": 1,
+      "term": "المصطلح أو المفهوم الواضح",
+      "definition": "التعريف أو الشرح المفصل والشامل الذي يساعد الطلاب على الفهم"
+    }
+  ]
+}
+
+نص المحاضرة:
+${transcript.substring(0, 30000)}`
+            : `You are an expert flashcard creator. Create 8-15 high-quality flashcards based on the following lecture transcript.
 
 CRITICAL REQUIREMENTS:
 - The transcript is in ${language}. You MUST write ALL terms and definitions in ${language}. Do NOT translate.
 - Generate 8-15 flashcards covering the most important terms, concepts, and key ideas from the transcript.
 - Each flashcard must contain:
-  * A clear term or concept (Term)
-  * A detailed definition or explanation (Definition)
-- Focus on technical terms, fundamental concepts, and important ideas.
-- Definitions should be clear and useful for students.
+  * A clear and specific term or concept (Term) - should be short and clear
+  * A detailed and useful definition or explanation (Definition) - should be comprehensive and clear
+- Focus on:
+  * Technical terms and fundamental concepts
+  * Important definitions and key ideas
+  * Concepts that need memorization or deep understanding
+- Definitions should be:
+  * Clear and understandable for students
+  * Comprehensive and cover important aspects
+  * Useful for review and study
+- Use clear, professional language.
 - Return ONLY valid JSON in this exact format (no markdown, no code blocks, no extra text):
+
 {
   "flashcards": [
     {
       "id": 1,
-      "term": "Term or Concept",
-      "definition": "Detailed definition or explanation"
+      "term": "Clear Term or Concept",
+      "definition": "Detailed and comprehensive definition or explanation that helps students understand"
     }
   ]
 }
