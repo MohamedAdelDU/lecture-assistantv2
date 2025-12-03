@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Brain, Target, Clock } from "lucide-react";
 import type { Flashcard } from "@/lib/mockData";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 
 interface FlashcardsViewProps {
   flashcards?: Flashcard[];
