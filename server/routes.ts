@@ -289,7 +289,7 @@ export async function registerRoutes(
     let keepAliveInterval: NodeJS.Timeout | null = null;
     const startKeepAlive = () => {
       keepAliveInterval = setInterval(() => {
-        if (!res.writableEnded && res.writable && !res.headersSent) {
+        if (!res.writableEnded && res.writable) {
           // Headers already sent, just send a heartbeat
           try {
             res.write(' '); // Send space to keep connection alive
@@ -300,7 +300,7 @@ export async function registerRoutes(
               keepAliveInterval = null;
             }
           }
-        } else if (res.writableEnded || !res.writable) {
+        } else {
           // Response finished, stop keep-alive
           if (keepAliveInterval) {
             clearInterval(keepAliveInterval);
