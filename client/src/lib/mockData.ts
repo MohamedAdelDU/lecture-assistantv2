@@ -17,6 +17,12 @@ export interface Slide {
   note?: string;
 }
 
+export interface Flashcard {
+  id: number;
+  term: string;
+  definition: string;
+}
+
 export interface Lecture {
   id: string;
   title: string;
@@ -29,6 +35,7 @@ export interface Lecture {
   transcript?: string;
   questions?: Question[];
   slides?: Slide[];
+  flashcards?: Flashcard[];
 }
 
 export const MOCK_LECTURES: Lecture[] = [

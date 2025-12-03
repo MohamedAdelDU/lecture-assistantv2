@@ -11,7 +11,7 @@ import { FeatureShowcase } from "@/components/home/FeatureShowcase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLectures } from "@/hooks/useLectures";
 import { extractVideoId, getYouTubeThumbnail, getYouTubeVideoInfo, getYouTubeTranscript, transcribeAudioFile, transcribeYouTubeWithWhisper } from "@/lib/youtubeService";
-import { generateSummary, generateQuiz, generateSlides } from "@/lib/aiService";
+import { generateSummary, generateQuiz, generateSlides, generateFlashcards } from "@/lib/aiService";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -383,7 +383,16 @@ export default function Home() {
         return;
       }
 
-      await updateLecture({ lectureId, updates: { progress: 100, slides, status: "completed" } });
+      await updateLecture({ lectureId, updates: { progress: 90, slides } });
+
+      // Generate flashcards with selected model
+      const flashcards = await generateFlashcards(transcript, selectedModel);
+      
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
+      await updateLecture({ lectureId, updates: { progress: 100, flashcards, status: "completed" } });
 
       setProcessingLectureId(null);
       setIsProcessingStopped(false);
@@ -520,7 +529,16 @@ export default function Home() {
         return;
       }
 
-      await updateLecture({ lectureId, updates: { progress: 100, slides, status: "completed" } });
+      await updateLecture({ lectureId, updates: { progress: 90, slides } });
+
+      // Generate flashcards with selected model
+      const flashcards = await generateFlashcards(transcript, selectedModel);
+      
+      if (isProcessingStopped && processingLectureId === lectureId) {
+        return;
+      }
+
+      await updateLecture({ lectureId, updates: { progress: 100, flashcards, status: "completed" } });
 
       setProcessingLectureId(null);
       setIsProcessingStopped(false);

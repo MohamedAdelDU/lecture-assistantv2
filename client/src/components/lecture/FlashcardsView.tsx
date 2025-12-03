@@ -1,21 +1,32 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Brain, Target, Clock } from "lucide-react";
+import type { Flashcard } from "@/lib/mockData";
 
-interface Flashcard {
-  id: number;
-  term: string;
-  definition: string;
+interface FlashcardsViewProps {
+  flashcards?: Flashcard[];
 }
 
-const MOCK_FLASHCARDS: Flashcard[] = [
-  { id: 1, term: "Wave Function (Ψ)", definition: "A mathematical description of the quantum state of an isolated quantum system." },
-  { id: 2, term: "Superposition", definition: "The ability of a quantum system to be in multiple states at the same time until it is measured." },
-  { id: 3, term: "Heisenberg Uncertainty Principle", definition: "It is impossible to measure the position and momentum of a particle with absolute precision simultaneously." },
-  { id: 4, term: "Quantum Entanglement", definition: "A phenomenon where particles become interconnected and the state of one instantly influences the state of the other, regardless of distance." }
-];
+export function FlashcardsView({ flashcards = [] }: FlashcardsViewProps) {
+  // If no flashcards provided, show empty state
+  if (!flashcards || flashcards.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Brain className="w-5 h-5 text-primary" />
+            Study Flashcards
+          </h3>
+          <Badge variant="outline" className="bg-primary/5">0 Cards</Badge>
+        </div>
+        <div className="text-center py-12 text-muted-foreground">
+          <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p>No flashcards available yet. Generate flashcards from the transcript.</p>
+        </div>
+      </div>
+    );
+  }
 
-export function FlashcardsView() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -23,11 +34,11 @@ export function FlashcardsView() {
           <Brain className="w-5 h-5 text-primary" />
           Study Flashcards
         </h3>
-        <Badge variant="outline" className="bg-primary/5">4 Cards</Badge>
+        <Badge variant="outline" className="bg-primary/5">{flashcards.length} Cards</Badge>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {MOCK_FLASHCARDS.map((card) => (
+        {flashcards.map((card) => (
           <div key={card.id} className="group h-48 w-full [perspective:1000px]">
             <div className="relative h-full w-full rounded-xl shadow-sm transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
               {/* Front */}

@@ -13,7 +13,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Lecture, Question, Slide } from "./mockData";
+import type { Lecture, Question, Slide, Flashcard } from "./mockData";
 
 // Convert Firestore data to Lecture format
 function firestoreToLecture(docData: any, id: string): Lecture {
@@ -29,6 +29,7 @@ function firestoreToLecture(docData: any, id: string): Lecture {
     transcript: docData.transcript || "",
     questions: docData.questions || [],
     slides: docData.slides || [],
+    flashcards: docData.flashcards || [],
   };
 }
 
@@ -47,6 +48,7 @@ function lectureToFirestore(lecture: Partial<Lecture>): any {
   if (lecture.transcript !== undefined && lecture.transcript !== null) data.transcript = lecture.transcript;
   if (lecture.questions !== undefined && lecture.questions !== null) data.questions = lecture.questions;
   if (lecture.slides !== undefined && lecture.slides !== null) data.slides = lecture.slides;
+  if (lecture.flashcards !== undefined && lecture.flashcards !== null) data.flashcards = lecture.flashcards;
   
   return data;
 }
@@ -66,6 +68,7 @@ function updatesToFirestore(updates: Partial<Lecture>): any {
   if (updates.transcript !== undefined && updates.transcript !== null) data.transcript = updates.transcript;
   if (updates.questions !== undefined && updates.questions !== null) data.questions = updates.questions;
   if (updates.slides !== undefined && updates.slides !== null) data.slides = updates.slides;
+  if (updates.flashcards !== undefined && updates.flashcards !== null) data.flashcards = updates.flashcards;
   
   // Always update the updatedAt timestamp
   data.updatedAt = Timestamp.now();

@@ -27,7 +27,7 @@ service cloud.firestore {
         
         // Allow updating existing lectures
         allow update: if isOwner(userId) && 
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'thumbnailUrl', 'duration', 'date', 'status', 'progress', 'summary', 'transcript', 'questions', 'slides', 'updatedAt']);
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'thumbnailUrl', 'duration', 'date', 'status', 'progress', 'summary', 'transcript', 'questions', 'slides', 'flashcards', 'updatedAt']);
         
         // Allow deleting own lectures
         allow delete: if isOwner(userId);

@@ -16,7 +16,7 @@ import { FlashcardsView } from "@/components/lecture/FlashcardsView";
 import { ChatAssistant } from "@/components/lecture/ChatAssistant";
 import { Brain } from "lucide-react";
 import { useLecture, useLectures } from "@/hooks/useLectures";
-import { generateSummary, generateQuiz, generateSlides } from "@/lib/aiService";
+import { generateSummary, generateQuiz, generateSlides, generateFlashcards } from "@/lib/aiService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -272,6 +272,7 @@ export default function LectureView() {
           summary: [],
           questions: [],
           slides: [],
+          flashcards: [],
         },
       });
 
@@ -297,7 +298,7 @@ export default function LectureView() {
       await updateLecture({
         lectureId: lecture.id,
         updates: {
-          progress: 75,
+          progress: 60,
           questions,
         },
       });
@@ -307,8 +308,18 @@ export default function LectureView() {
       await updateLecture({
         lectureId: lecture.id,
         updates: {
-          progress: 100,
+          progress: 80,
           slides,
+        },
+      });
+
+      // Generate flashcards with selected model
+      const flashcards = await generateFlashcards(transcript, selectedModel);
+      await updateLecture({
+        lectureId: lecture.id,
+        updates: {
+          progress: 100,
+          flashcards,
           status: "completed",
         },
       });
@@ -610,7 +621,7 @@ export default function LectureView() {
               </TabsContent>
 
               <TabsContent value="flashcards" className="mt-0 animate-in fade-in-50 duration-300">
-                <FlashcardsView />
+                <FlashcardsView flashcards={lecture?.flashcards} />
               </TabsContent>
             </div>
           </Tabs>

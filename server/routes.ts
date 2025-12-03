@@ -1050,6 +1050,181 @@ ${transcript.substring(0, 30000)}`;
   });
 
   /**
+   * Flashcard generation endpoint
+   * POST /api/ai/flashcards
+   * Body: { "transcript": "...", "mode": "gpu" | "api" }
+   * Returns: { "flashcards": [{ "id": 1, "term": "...", "definition": "..." }] }
+   */
+  app.post("/api/ai/flashcards", async (req: Request, res: Response) => {
+    try {
+      const { transcript, mode } = req.body as { transcript?: string; mode?: "gpu" | "api" };
+
+      const isGpuMode = mode === "gpu";
+
+      if (!transcript || typeof transcript !== "string" || transcript.trim().length < 200) {
+        return res.status(400).json({
+          error: "Transcript is too short to generate flashcards (minimum 200 characters)",
+        });
+      }
+
+      console.log(`[API] Generating flashcards for transcript (${transcript.length} characters)`);
+
+      // Priority 1: Gemini API (skip if GPU mode is requested)
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+
+      if (geminiApiKey && !isGpuMode) {
+        try {
+          console.log("[API] Using Gemini API for flashcard generation");
+          const genAI = new GoogleGenerativeAI(geminiApiKey);
+          const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+          const hasArabic = /[\u0600-\u06FF]/.test(transcript);
+          const language = hasArabic ? "Arabic" : "English";
+
+          const prompt = `You are an expert flashcard creator. Create 8-15 high-quality flashcards based on the following lecture transcript.
+
+CRITICAL REQUIREMENTS:
+- The transcript is in ${language}. You MUST write ALL terms and definitions in ${language}. Do NOT translate.
+- Generate 8-15 flashcards covering the most important terms, concepts, and key ideas from the transcript.
+- Each flashcard must contain:
+  * A clear term or concept (Term)
+  * A detailed definition or explanation (Definition)
+- Focus on technical terms, fundamental concepts, and important ideas.
+- Definitions should be clear and useful for students.
+- Return ONLY valid JSON in this exact format (no markdown, no code blocks, no extra text):
+{
+  "flashcards": [
+    {
+      "id": 1,
+      "term": "Term or Concept",
+      "definition": "Detailed definition or explanation"
+    }
+  ]
+}
+
+Transcript:
+${transcript.substring(0, 30000)}`;
+
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const aiResponse: string = response.text().trim();
+
+          if (aiResponse) {
+            // Parse JSON from response (remove markdown code blocks if present)
+            let parsedResponse: { flashcards?: any[] };
+            try {
+              const cleanedResponse = aiResponse
+                .replace(/```json\n?/g, "")
+                .replace(/```\n?/g, "")
+                .trim();
+              parsedResponse = JSON.parse(cleanedResponse);
+            } catch (parseError) {
+              console.warn("[API] Failed to parse JSON from Gemini flashcard response");
+              parsedResponse = { flashcards: [] };
+            }
+
+            if (parsedResponse.flashcards && Array.isArray(parsedResponse.flashcards) && parsedResponse.flashcards.length > 0) {
+              // Validate and format flashcards
+              const validFlashcards = parsedResponse.flashcards
+                .filter((f: any) => f.term && f.definition)
+                .map((f: any, index: number) => ({
+                  id: index + 1,
+                  term: f.term.trim(),
+                  definition: f.definition.trim(),
+                }));
+
+              if (validFlashcards.length > 0) {
+                console.log(`[API] Gemini flashcards generated with ${validFlashcards.length} cards`);
+                return res.json({ flashcards: validFlashcards });
+              }
+            }
+          }
+        } catch (geminiError: any) {
+          console.error("[API] Gemini API error for flashcards:", geminiError);
+          // Fall through to Qwen GPU / fallback
+        }
+      }
+
+      // Priority 2: Qwen GPU (local AI model) - only if GPU mode is requested
+      if (isGpuMode) {
+        try {
+          console.log("[API] Using Qwen GPU model for flashcard generation");
+          
+          const pythonCmd = getPythonCommand();
+          const pythonScript = path.join(__dirname, "scripts", "generate_flashcards.py");
+          
+          // Escape transcript for command line (handle quotes and special characters)
+          const escapedTranscript = transcript.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+          
+          const command = `${pythonCmd} "${pythonScript}" "${escapedTranscript}" "cuda"`;
+          
+          const { stdout, stderr } = await execAsync(command);
+          
+          if (stderr) {
+            console.error(`[API] Python stderr (flashcards):`, stderr);
+          }
+          
+          const result = JSON.parse(stdout.trim());
+          
+          if (result.success && result.flashcards && Array.isArray(result.flashcards) && result.flashcards.length > 0) {
+            // Validate and format flashcards
+            const validFlashcards = result.flashcards
+              .filter((f: any) => f.term && f.definition)
+              .map((f: any, index: number) => ({
+                id: index + 1,
+                term: f.term.trim(),
+                definition: f.definition.trim(),
+              }));
+
+            if (validFlashcards.length > 0) {
+              console.log(`[API] Qwen GPU flashcards generated with ${validFlashcards.length} cards`);
+              return res.json({ flashcards: validFlashcards });
+            }
+          } else {
+            console.error("[API] Qwen GPU flashcard generation failed:", result.error || "Unknown error");
+            // Fall through to fallback
+          }
+        } catch (qwenError: any) {
+          console.error("[API] Qwen GPU error for flashcards:", qwenError);
+          // Fall through to fallback
+        }
+      }
+
+      // Fallback: Simple flashcard generation
+      console.log("[API] Using fallback flashcard generation");
+      const sentences = transcript
+        .split(/[.!؟\n]+/)
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 20 && s.length < 150);
+
+      const flashcards: any[] = [];
+      if (sentences.length > 0) {
+        const hasArabic = /[\u0600-\u06FF]/.test(transcript);
+        const lang = hasArabic ? "ar" : "en";
+
+        // Extract first few sentences as simple flashcards
+        sentences.slice(0, Math.min(5, sentences.length)).forEach((sentence, idx) => {
+          const words = sentence.split(/\s+/);
+          if (words.length > 3) {
+            const term = words.slice(0, 3).join(" ");
+            const definition = sentence;
+            flashcards.push({
+              id: idx + 1,
+              term: term,
+              definition: definition,
+            });
+          }
+        });
+      }
+
+      return res.json({ flashcards });
+    } catch (error: any) {
+      console.error("[API] Error generating flashcards:", error);
+      res.status(500).json({ error: "Failed to generate flashcards" });
+    }
+  });
+
+  /**
    * Text summarization endpoint using Gemini API
    * POST /api/summarize
    * Body: { "text": "some long text here..." }

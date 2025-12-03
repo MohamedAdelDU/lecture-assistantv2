@@ -247,18 +247,67 @@ export async function generateSlides(
   }
 }
 
-// Generate flashcards from transcript
-export async function generateFlashcards(transcript: string): Promise<any[]> {
-  // Simplified flashcard generation
-  // In production, extract key terms and definitions using AI
-  
-  return [
-    {
-      id: 1,
-      front: "Main Concept",
-      back: "The primary topic discussed in this lecture",
-    },
-  ];
+// Generate flashcards from transcript using AI
+export async function generateFlashcards(transcript: string, mode?: "gpu" | "api"): Promise<any[]> {
+  try {
+    console.log(`[aiService] Generating AI flashcards (mode: ${mode || "api"})...`);
+    
+    if (!transcript || transcript.length < 200) {
+      console.warn("[aiService] Transcript too short for flashcard generation");
+      return [];
+    }
+
+    // Call backend API for AI flashcard generation
+    const response = await fetch("/api/ai/flashcards", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ transcript, mode }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to generate flashcards");
+    }
+
+    if (!data.flashcards || !Array.isArray(data.flashcards)) {
+      throw new Error("Invalid flashcard format received");
+    }
+
+    // Map backend format to flashcard interface
+    const flashcards = data.flashcards.map((f: any) => ({
+      id: f.id || 0,
+      term: f.term || "",
+      definition: f.definition || "",
+    }));
+
+    console.log(`[aiService] AI flashcards generated with ${flashcards.length} cards`);
+    return flashcards;
+  } catch (error: any) {
+    console.error("[aiService] Error generating flashcards:", error);
+    
+    // Fallback to simple flashcards
+    if (!transcript || transcript.length < 100) {
+      return [];
+    }
+
+    const sentences = transcript
+      .split(/[.!?]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 20);
+
+    return sentences.slice(0, 5).map((sentence, idx) => {
+      const words = sentence.split(/\s+/);
+      const term = words.slice(0, 3).join(" ");
+      return {
+        id: idx + 1,
+        term: term,
+        definition: sentence,
+      };
+    });
+  }
 }
 
 // Slide theme type
