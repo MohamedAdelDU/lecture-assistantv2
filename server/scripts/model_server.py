@@ -135,24 +135,40 @@ class ModelHandler(BaseHTTPRequestHandler):
             torch_module = None
             cuda_available = (device == "cuda" or device == "gpu")
         
-        # Transcribe using cached model
+        # Transcribe using cached model with quality settings
         is_gpu = (device == "cuda" or device == "gpu")
-        beam_size = 3 if is_gpu else 2
+        is_large_model = "large" in model_size.lower() or "medium" in model_size.lower()
         
-        print(f"[ModelServer] Transcribing: {file_path}", file=sys.stderr)
+        # Use high-quality settings for GPU + large models
+        if is_gpu and is_large_model:
+            beam_size = 5
+        elif is_gpu:
+            beam_size = 5
+        else:
+            beam_size = 3
+        
+        # Prepare initial prompt for better accuracy (especially for Arabic)
+        initial_prompt = None
+        if language == "ar":
+            initial_prompt = "هذه محاضرة باللغة العربية تتحدث عن"
+        elif language and language != "None":
+            initial_prompt = f"This is a lecture in {language} about"
+        
+        print(f"[ModelServer] Transcribing: {file_path} (beam_size={beam_size}, quality mode)", file=sys.stderr)
         segments, info = model.transcribe(
             file_path,
             language=language,
             beam_size=beam_size,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
-            condition_on_previous_text=False,
+            condition_on_previous_text=True if is_gpu else False,  # Better context on GPU
+            initial_prompt=initial_prompt,  # Custom prompt for better accuracy
             word_timestamps=False,
             temperature=0.0,
             compression_ratio_threshold=2.4,
             log_prob_threshold=-1.0,
             no_speech_threshold=0.6,
-            best_of=1,
+            best_of=5 if (is_gpu and is_large_model) else 2,  # More candidates = better quality
             patience=1.0,
         )
         
@@ -232,12 +248,42 @@ class ModelHandler(BaseHTTPRequestHandler):
         # Suppress default logging
         pass
 
+def preload_models():
+    """Preload all models at startup for better performance"""
+    print("[ModelServer] ========================================", file=sys.stderr)
+    print("[ModelServer] Preloading models at startup...", file=sys.stderr)
+    print("[ModelServer] This may take 30-60 seconds...", file=sys.stderr)
+    print("[ModelServer] ========================================", file=sys.stderr)
+    
+    try:
+        # Preload Whisper large-v3 on GPU (most commonly used)
+        print("[ModelServer] [1/2] Preloading Whisper large-v3 on GPU...", file=sys.stderr)
+        load_whisper_model("large-v3", "cuda", "float16")
+        print("[ModelServer] ✓ Whisper large-v3 loaded successfully", file=sys.stderr)
+        
+        # Preload Qwen model on GPU
+        print("[ModelServer] [2/2] Preloading Qwen 3B-Instruct on GPU...", file=sys.stderr)
+        load_qwen_model("cuda")
+        print("[ModelServer] ✓ Qwen 3B-Instruct loaded successfully", file=sys.stderr)
+        
+        print("[ModelServer] ========================================", file=sys.stderr)
+        print("[ModelServer] ✓ All models preloaded successfully!", file=sys.stderr)
+        print("[ModelServer] Server is ready to handle requests", file=sys.stderr)
+        print("[ModelServer] ========================================", file=sys.stderr)
+    except Exception as e:
+        print(f"[ModelServer] ⚠ Warning: Failed to preload some models: {e}", file=sys.stderr)
+        print(f"[ModelServer] Models will be loaded on first request instead", file=sys.stderr)
+        import traceback
+        print(f"[ModelServer] Traceback: {traceback.format_exc()}", file=sys.stderr)
+
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     
+    # Preload models before starting server
+    preload_models()
+    
     server = HTTPServer(('localhost', port), ModelHandler)
     print(f"[ModelServer] Starting model server on port {port}", file=sys.stderr)
-    print(f"[ModelServer] Models will be loaded on first request", file=sys.stderr)
     
     try:
         server.serve_forever()

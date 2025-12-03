@@ -94,13 +94,13 @@ export function startModelServer(): Promise<void> {
       modelServerProcess = null;
     });
 
-    // Timeout after 30 seconds
+    // Timeout after 90 seconds (models need time to preload)
     startupTimeout = setTimeout(() => {
       if (!hasStarted) {
-        console.log(`[ModelServer] Server startup timeout, but continuing anyway`);
-        resolve(); // Resolve anyway - server might be starting
+        console.log(`[ModelServer] Server startup timeout (models may still be loading), but continuing anyway`);
+        resolve(); // Resolve anyway - server might be starting or models loading
       }
-    }, 30000);
+    }, 90000); // 90 seconds for model preloading
   });
 }
 

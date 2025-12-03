@@ -64,11 +64,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Start model server in background (loads models once and keeps them in memory)
+  // Start model server in background (preloads models and keeps them in memory)
   if (process.env.NODE_ENV === "production" || process.env.START_MODEL_SERVER !== "false") {
     try {
+      console.log("[Server] Starting model server - models will be preloaded...");
       await startModelServer();
-      console.log("[Server] Model server started - models will be loaded on first request");
+      console.log("[Server] Model server started - all models preloaded and ready!");
     } catch (error) {
       console.error("[Server] Failed to start model server, will use direct scripts:", error);
     }
