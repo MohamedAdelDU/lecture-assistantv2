@@ -16,6 +16,19 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Helper function to get Python scripts directory
+// In production (dist/), scripts are in ../server/scripts/
+// In development, scripts are in ./scripts/
+function getScriptsDir(): string {
+  // Check if we're in dist/ (production build)
+  if (__dirname.includes("dist")) {
+    // In production, go up to project root then to server/scripts
+    return path.resolve(__dirname, "..", "server", "scripts");
+  }
+  // In development, scripts are relative to current directory
+  return path.join(__dirname, "scripts");
+}
+
 // Helper function to get the correct Python command based on OS
 function getPythonCommand(): string {
   // Check for custom Python command from environment
@@ -110,7 +123,7 @@ export async function registerRoutes(
 
       try {
         const pythonCmd = getPythonCommand();
-        const pythonScript = path.join(__dirname, "scripts", "get_video_info.py");
+        const pythonScript = path.join(getScriptsDir(), "get_video_info.py");
         const { stdout, stderr } = await execAsync(
           `${pythonCmd} "${pythonScript}" "${videoId}"`,
         );
@@ -174,7 +187,7 @@ export async function registerRoutes(
 
       try {
         console.log(`[API] Calling Python script to fetch transcript...`);
-        const pythonScript = path.join(__dirname, "scripts", "get_transcript.py");
+        const pythonScript = path.join(getScriptsDir(), "get_transcript.py");
 
         // Build command with optional time parameters
         const pythonCmd = getPythonCommand();
@@ -348,7 +361,7 @@ export async function registerRoutes(
         
         // Step 1: Download audio from YouTube (if not found in Firebase)
         if (!downloadedFilePath) {
-          const downloadScript = path.join(__dirname, "scripts", "download_youtube_audio.py");
+          const downloadScript = path.join(getScriptsDir(), "download_youtube_audio.py");
           
           let downloadCommand = `${pythonCmd} "${downloadScript}" "${videoId}"`;
           if (startTimeSeconds !== null) {
@@ -394,7 +407,7 @@ export async function registerRoutes(
         }
 
         // Step 2: Transcribe using Whisper
-        const transcribeScript = path.join(__dirname, "scripts", "transcribe_audio.py");
+        const transcribeScript = path.join(getScriptsDir(), "transcribe_audio.py");
         
         let transcribeCommand = `${pythonCmd} "${transcribeScript}" "${downloadedFilePath}" "${modelSize}"`;
         if (language) {
@@ -837,7 +850,7 @@ ${transcript.substring(0, 20000)}`,
           console.log("[API] Using Qwen GPU model for summary generation");
           
           const pythonCmd = getPythonCommand();
-          const pythonScript = path.join(__dirname, "scripts", "generate_summary.py");
+          const pythonScript = path.join(getScriptsDir(), "generate_summary.py");
           
           // Escape transcript for command line (handle quotes and special characters)
           const escapedTranscript = transcript.replace(/"/g, '\\"').replace(/\$/g, '\\$');
@@ -1053,7 +1066,7 @@ ${transcript.substring(0, 30000)}`;
           console.log("[API] Using Qwen GPU model for quiz generation");
           
           const pythonCmd = getPythonCommand();
-          const pythonScript = path.join(__dirname, "scripts", "generate_quiz.py");
+          const pythonScript = path.join(getScriptsDir(), "generate_quiz.py");
           
           // Escape transcript for command line (handle quotes and special characters)
           const escapedTranscript = transcript.replace(/"/g, '\\"').replace(/\$/g, '\\$');
@@ -1276,7 +1289,7 @@ ${transcript.substring(0, 30000)}`;
           console.log("[API] Using Qwen GPU model for flashcard generation");
           
           const pythonCmd = getPythonCommand();
-          const pythonScript = path.join(__dirname, "scripts", "generate_flashcards.py");
+          const pythonScript = path.join(getScriptsDir(), "generate_flashcards.py");
           
           // Escape transcript for command line (handle quotes and special characters)
           const escapedTranscript = transcript.replace(/"/g, '\\"').replace(/\$/g, '\\$');
