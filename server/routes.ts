@@ -272,57 +272,9 @@ export async function registerRoutes(
     // Get userId from request body or auth (if available)
     const userId = req.body.userId || (req as any).user?.uid || "anonymous";
     
-    // Set longer timeout and keep-alive headers to prevent proxy timeout
+    // Set longer timeout to prevent proxy timeout
     req.setTimeout(600000); // 10 minutes timeout
     res.setTimeout(600000); // 10 minutes timeout
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Keep-Alive', 'timeout=600, max=1000');
-    res.setHeader('Cache-Control', 'no-cache');
-    
-    // Send periodic keep-alive chunks to prevent proxy timeout (chunked transfer encoding)
-    let keepAliveInterval: NodeJS.Timeout | null = null;
-    const startKeepAlive = () => {
-      if (!res.headersSent) {
-        res.writeHead(200, {
-          'Content-Type': 'application/json',
-          'Transfer-Encoding': 'chunked',
-          'Connection': 'keep-alive',
-          'Keep-Alive': 'timeout=600, max=1000',
-        });
-      }
-      
-      keepAliveInterval = setInterval(() => {
-        if (!res.writableEnded && res.writable) {
-          try {
-            res.write('\n'); // Send newline to keep connection alive
-          } catch (e) {
-            // Connection closed, stop keep-alive
-            if (keepAliveInterval) {
-              clearInterval(keepAliveInterval);
-              keepAliveInterval = null;
-            }
-          }
-        } else {
-          if (keepAliveInterval) {
-            clearInterval(keepAliveInterval);
-            keepAliveInterval = null;
-          }
-        }
-      }, 20000); // Every 20 seconds
-    };
-    
-    // Start keep-alive after a short delay
-    setTimeout(startKeepAlive, 5000);
-    
-    // Clean up interval on finish or error
-    const cleanup = () => {
-      if (keepAliveInterval) {
-        clearInterval(keepAliveInterval);
-        keepAliveInterval = null;
-      }
-    };
-    res.on('finish', cleanup);
-    res.on('close', cleanup);
     
     try {
       const { videoId, startTime, endTime, modelSize = "large-v3", language, device = "cuda" } = req.body;
@@ -453,8 +405,11 @@ export async function registerRoutes(
           `[API] Successfully transcribed YouTube audio (${transcript.length} characters, ${transcribeResult.wordCount} words, language: ${transcribeResult.language})`,
         );
 
-        // Stop keep-alive before sending final response
-        cleanup();
+        // Check if response already sent to avoid double response
+        if (res.headersSent) {
+          console.warn("[API] Response already sent, skipping duplicate response");
+          return;
+        }
         
         res.json({
           transcript,
@@ -465,6 +420,12 @@ export async function registerRoutes(
         });
       } catch (pythonError: any) {
         console.error("[API] Error in YouTube transcription:", pythonError);
+
+        // Check if response already sent
+        if (res.headersSent) {
+          console.warn("[API] Response already sent, skipping error response");
+          return;
+        }
 
         let errorMessage = "Failed to transcribe YouTube audio";
         if (pythonError.message?.includes("No module named 'yt_dlp'")) {
@@ -480,6 +441,13 @@ export async function registerRoutes(
       }
     } catch (error: any) {
       console.error("[API] Error in YouTube transcription endpoint:", error);
+      
+      // Check if response already sent
+      if (res.headersSent) {
+        console.warn("[API] Response already sent, skipping error response");
+        return;
+      }
+      
       res.status(500).json({ error: "Failed to transcribe YouTube audio" });
     } finally {
       // Clean up downloaded file
