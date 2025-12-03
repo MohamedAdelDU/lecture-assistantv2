@@ -457,32 +457,25 @@ export default function Home() {
         }
       }
       
-      // Use Whisper for GPU mode, YouTube Transcript API for API mode
-      let transcript: string | null = null;
-      
-      if (selectedModel === "gpu") {
-        // GPU mode: Use Whisper for transcription
-        console.log(`[Home] Using Whisper to transcribe YouTube video: ${videoId} (GPU mode)`);
-        const device = selectedWhisperDevice === "gpu" ? "cuda" : "cpu";
-        transcript = await transcribeYouTubeWithWhisper(
-          videoId,
-          selectedWhisperModel,
-          undefined, // auto-detect language
-          device,
-          startTimeSeconds,
-          endTimeSeconds,
-          user?.uid // Pass user ID for Firebase Storage
-        );
-      } else {
-        // API mode: Use YouTube Transcript API
-        console.log(`[Home] Using YouTube Transcript API for video: ${videoId} (API mode)`);
-        transcript = await getYouTubeTranscript(videoId, startTimeSeconds, endTimeSeconds);
-      }
+      // Always use Whisper for transcription (YouTube Transcript API is blocked on cloud providers)
+      // Mode only affects AI generation (Qwen vs Gemini), not transcription
+      console.log(`[Home] Using Whisper to transcribe YouTube video: ${videoId} (device: ${selectedWhisperDevice})`);
+      const device = selectedWhisperDevice === "gpu" ? "cuda" : "cpu";
+      const transcript = await transcribeYouTubeWithWhisper(
+        videoId,
+        selectedWhisperModel,
+        undefined, // auto-detect language
+        device,
+        startTimeSeconds,
+        endTimeSeconds,
+        user?.uid // Pass user ID for Firebase Storage
+      );
       
       console.log(`[Home] Transcript received:`, {
         length: transcript?.length || 0,
         preview: transcript?.substring(0, 100) || "empty",
-        method: selectedModel === "gpu" ? "Whisper" : "YouTube Transcript API"
+        method: "Whisper",
+        device: selectedWhisperDevice
       });
       
       if (!transcript || transcript.length === 0) {
