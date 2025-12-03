@@ -95,19 +95,28 @@ def transcribe_audio(file_path, model_size="base", language=None, device="cpu"):
         is_gpu = (device == "cuda" or device == "gpu")
         is_large_model = "large" in model_size.lower() or "medium" in model_size.lower()
         
-        # Optimize beam_size for speed vs accuracy tradeoff
-        # Lower beam_size = faster but slightly less accurate
-        # Higher beam_size = slower but more accurate
+        # Optimize beam_size for quality vs speed tradeoff
+        # Higher beam_size = better accuracy but slower
+        # For GPU with large models, prioritize quality
         if is_gpu and is_large_model:
-            # GPU + large model: use beam_size=3 for faster processing (was 5)
-            beam_size = 3
-            print(f"[Whisper] Using optimized settings for GPU + large model (beam_size={beam_size})", file=sys.stderr)
+            # GPU + large model: use beam_size=5 for best accuracy
+            beam_size = 5
+            print(f"[Whisper] Using high-quality settings for GPU + large model (beam_size={beam_size})", file=sys.stderr)
         elif is_gpu:
-            # GPU + smaller model: use beam_size=3
-            beam_size = 3
+            # GPU + smaller model: use beam_size=5 for better quality
+            beam_size = 5
         else:
             # CPU mode - use lower beam size for faster processing
-            beam_size = 2
+            beam_size = 3
+        
+        # Prepare initial prompt for better accuracy (especially for Arabic)
+        initial_prompt = None
+        if language == "ar":
+            # Arabic prompt to improve accuracy
+            initial_prompt = "هذه محاضرة باللغة العربية تتحدث عن"
+        elif language and language != "None":
+            # Generic prompt for other languages
+            initial_prompt = f"This is a lecture in {language} about"
         
         print(f"[Whisper] Transcribing audio file: {file_path}", file=sys.stderr)
         segments, info = model.transcribe(
@@ -116,17 +125,17 @@ def transcribe_audio(file_path, model_size="base", language=None, device="cpu"):
             beam_size=beam_size,
             vad_filter=True,  # Voice Activity Detection filter
             vad_parameters=dict(min_silence_duration_ms=500),
-            # Additional optimizations for speed
-            condition_on_previous_text=False,  # Disable for faster processing
-            initial_prompt=None,  # Can be customized for better results
+            # Quality optimizations
+            condition_on_previous_text=True if is_gpu else False,  # Better context on GPU
+            initial_prompt=initial_prompt,  # Custom prompt for better accuracy
             word_timestamps=False,  # Disable for faster processing (enable if needed)
             temperature=0.0,  # Deterministic output
             compression_ratio_threshold=2.4,  # Filter out low-quality segments
             log_prob_threshold=-1.0,  # Filter out low-confidence segments
             no_speech_threshold=0.6,  # Threshold for detecting speech
-            # Speed optimizations
-            best_of=1,  # Use only 1 candidate (faster, was default 5)
-            patience=1.0,  # Lower patience for faster decoding
+            # Quality settings (instead of speed)
+            best_of=5 if (is_gpu and is_large_model) else 2,  # More candidates = better quality
+            patience=1.0,  # Standard patience
         )
         
         # Extract detected language
