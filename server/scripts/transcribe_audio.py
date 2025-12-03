@@ -95,47 +95,57 @@ def transcribe_audio(file_path, model_size="base", language=None, device="cpu"):
         is_gpu = (device == "cuda" or device == "gpu")
         is_large_model = "large" in model_size.lower() or "medium" in model_size.lower()
         
-        # Optimize beam_size for quality vs speed tradeoff
+        # Maximum quality settings for Whisper
         # Higher beam_size = better accuracy but slower
-        # For GPU with large models, prioritize quality
+        # For GPU with large models, use maximum quality settings
         if is_gpu and is_large_model:
-            # GPU + large model: use beam_size=5 for best accuracy
-            beam_size = 5
-            print(f"[Whisper] Using high-quality settings for GPU + large model (beam_size={beam_size})", file=sys.stderr)
+            # GPU + large model: use beam_size=10 for maximum accuracy
+            beam_size = 10
+            best_of = 10  # More candidates = better quality
+            print(f"[Whisper] Using MAXIMUM quality settings for GPU + large model (beam_size={beam_size}, best_of={best_of})", file=sys.stderr)
         elif is_gpu:
-            # GPU + smaller model: use beam_size=5 for better quality
-            beam_size = 5
+            # GPU + smaller model: use beam_size=8 for high quality
+            beam_size = 8
+            best_of = 8
         else:
-            # CPU mode - use lower beam size for faster processing
-            beam_size = 3
+            # CPU mode - use moderate settings
+            beam_size = 5
+            best_of = 5
         
-        # Prepare initial prompt for better accuracy (especially for Arabic)
+        # Prepare enhanced initial prompt for better accuracy (especially for Arabic)
         initial_prompt = None
         if language == "ar":
-            # Arabic prompt to improve accuracy
-            initial_prompt = "هذه محاضرة باللغة العربية تتحدث عن"
+            # Enhanced Arabic prompt to improve accuracy significantly
+            initial_prompt = "هذه محاضرة أكاديمية باللغة العربية تتحدث عن موضوع تعليمي. النص واضح ومفصل."
         elif language and language != "None":
-            # Generic prompt for other languages
-            initial_prompt = f"This is a lecture in {language} about"
+            # Enhanced prompt for other languages
+            initial_prompt = f"This is an academic lecture in {language}. The text is clear and detailed."
         
-        print(f"[Whisper] Transcribing audio file: {file_path}", file=sys.stderr)
+        print(f"[Whisper] Transcribing audio file: {file_path} with MAXIMUM quality settings", file=sys.stderr)
         segments, info = model.transcribe(
             file_path,
             language=language,
             beam_size=beam_size,
             vad_filter=True,  # Voice Activity Detection filter
-            vad_parameters=dict(min_silence_duration_ms=500),
-            # Quality optimizations
-            condition_on_previous_text=True if is_gpu else False,  # Better context on GPU
-            initial_prompt=initial_prompt,  # Custom prompt for better accuracy
-            word_timestamps=False,  # Disable for faster processing (enable if needed)
+            vad_parameters=dict(
+                min_silence_duration_ms=500,
+                threshold=0.5,  # Lower threshold for better detection
+            ),
+            # Maximum quality optimizations
+            condition_on_previous_text=True,  # Always use context for better accuracy
+            initial_prompt=initial_prompt,  # Enhanced prompt for better accuracy
+            word_timestamps=True,  # Enable for better word-level accuracy
             temperature=0.0,  # Deterministic output
             compression_ratio_threshold=2.4,  # Filter out low-quality segments
             log_prob_threshold=-1.0,  # Filter out low-confidence segments
-            no_speech_threshold=0.6,  # Threshold for detecting speech
-            # Quality settings (instead of speed)
-            best_of=5 if (is_gpu and is_large_model) else 2,  # More candidates = better quality
-            patience=1.0,  # Standard patience
+            no_speech_threshold=0.5,  # Lower threshold for better speech detection
+            # Maximum quality settings
+            best_of=best_of,  # More candidates = better quality
+            patience=2.0,  # Higher patience for better results
+            # Additional quality parameters
+            suppress_blank=True,  # Suppress blank outputs
+            suppress_tokens=[-1],  # Suppress special tokens
+            without_timestamps=False,  # Keep timestamps for better alignment
         )
         
         # Extract detected language

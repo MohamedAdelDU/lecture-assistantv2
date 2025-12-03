@@ -139,37 +139,46 @@ class ModelHandler(BaseHTTPRequestHandler):
         is_gpu = (device == "cuda" or device == "gpu")
         is_large_model = "large" in model_size.lower() or "medium" in model_size.lower()
         
-        # Use high-quality settings for GPU + large models
+        # Maximum quality settings for Whisper
         if is_gpu and is_large_model:
-            beam_size = 5
+            beam_size = 10
+            best_of = 10
         elif is_gpu:
-            beam_size = 5
+            beam_size = 8
+            best_of = 8
         else:
-            beam_size = 3
+            beam_size = 5
+            best_of = 5
         
-        # Prepare initial prompt for better accuracy (especially for Arabic)
+        # Prepare enhanced initial prompt for better accuracy (especially for Arabic)
         initial_prompt = None
         if language == "ar":
-            initial_prompt = "هذه محاضرة باللغة العربية تتحدث عن"
+            initial_prompt = "هذه محاضرة أكاديمية باللغة العربية تتحدث عن موضوع تعليمي. النص واضح ومفصل."
         elif language and language != "None":
-            initial_prompt = f"This is a lecture in {language} about"
+            initial_prompt = f"This is an academic lecture in {language}. The text is clear and detailed."
         
-        print(f"[ModelServer] Transcribing: {file_path} (beam_size={beam_size}, quality mode)", file=sys.stderr)
+        print(f"[ModelServer] Transcribing: {file_path} (beam_size={beam_size}, best_of={best_of}, MAXIMUM quality)", file=sys.stderr)
         segments, info = model.transcribe(
             file_path,
             language=language,
             beam_size=beam_size,
             vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500),
-            condition_on_previous_text=True if is_gpu else False,  # Better context on GPU
-            initial_prompt=initial_prompt,  # Custom prompt for better accuracy
-            word_timestamps=False,
+            vad_parameters=dict(
+                min_silence_duration_ms=500,
+                threshold=0.5,  # Lower threshold for better detection
+            ),
+            condition_on_previous_text=True,  # Always use context for better accuracy
+            initial_prompt=initial_prompt,  # Enhanced prompt for better accuracy
+            word_timestamps=True,  # Enable for better word-level accuracy
             temperature=0.0,
             compression_ratio_threshold=2.4,
             log_prob_threshold=-1.0,
-            no_speech_threshold=0.6,
-            best_of=5 if (is_gpu and is_large_model) else 2,  # More candidates = better quality
-            patience=1.0,
+            no_speech_threshold=0.5,  # Lower threshold for better speech detection
+            best_of=best_of,  # More candidates = better quality
+            patience=2.0,  # Higher patience for better results
+            suppress_blank=True,  # Suppress blank outputs
+            suppress_tokens=[-1],  # Suppress special tokens
+            without_timestamps=False,  # Keep timestamps for better alignment
         )
         
         # Collect segments

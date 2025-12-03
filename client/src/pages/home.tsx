@@ -35,7 +35,6 @@ export default function Home() {
   // When GPU mode is selected, automatically use GPU + large-v3
   const selectedWhisperDevice: "cpu" | "gpu" = selectedModel === "gpu" ? "gpu" : "cpu";
   const selectedWhisperModel: string = selectedModel === "gpu" ? "large-v3" : "base";
-  const [useWhisperForYouTube, setUseWhisperForYouTube] = useState<boolean>(true); // Default to true - use Whisper for better quality
   const { language } = useLanguage();
 
   const t = {
@@ -469,29 +468,23 @@ export default function Home() {
         }
       }
       
-      // Use Whisper if enabled, otherwise use transcript API
-      let transcript: string | null = null;
-      if (useWhisperForYouTube) {
-        console.log(`[Home] Using Whisper to transcribe YouTube video: ${videoId}`);
-        const device = selectedWhisperDevice === "gpu" ? "cuda" : "cpu";
-        transcript = await transcribeYouTubeWithWhisper(
-          videoId,
-          selectedWhisperModel,
-          undefined, // auto-detect language
-          device,
-          startTimeSeconds,
-          endTimeSeconds,
-          user?.uid // Pass user ID for Firebase Storage
-        );
-      } else {
-        console.log(`[Home] Using YouTube transcript API for video: ${videoId}`);
-        transcript = await getYouTubeTranscript(videoId, startTimeSeconds, endTimeSeconds);
-      }
+      // Always use Whisper for best quality
+      console.log(`[Home] Using Whisper to transcribe YouTube video: ${videoId}`);
+      const device = selectedWhisperDevice === "gpu" ? "cuda" : "cpu";
+      const transcript = await transcribeYouTubeWithWhisper(
+        videoId,
+        selectedWhisperModel,
+        undefined, // auto-detect language
+        device,
+        startTimeSeconds,
+        endTimeSeconds,
+        user?.uid // Pass user ID for Firebase Storage
+      );
       
       console.log(`[Home] Transcript received:`, {
         length: transcript?.length || 0,
         preview: transcript?.substring(0, 100) || "empty",
-        method: useWhisperForYouTube ? "Whisper" : "Transcript API"
+        method: "Whisper"
       });
       
       if (!transcript || transcript.length === 0) {
@@ -820,10 +813,6 @@ export default function Home() {
                           type="button"
                           onClick={() => {
                             setSelectedModel("gpu");
-                            // Auto-enable Whisper when GPU is selected for better quality
-                            if (!useWhisperForYouTube) {
-                              setUseWhisperForYouTube(true);
-                            }
                           }}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
@@ -875,29 +864,6 @@ export default function Home() {
                         </motion.button>
                       </motion.div>
                       
-                      {/* Whisper for YouTube Toggle */}
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 1.1 }}
-                        className={`flex items-center gap-2 ${language === "ar" ? "flex-row-reverse" : ""}`}
-                      >
-                        <motion.button
-                          type="button"
-                          onClick={() => setUseWhisperForYouTube(!useWhisperForYouTube)}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                            useWhisperForYouTube
-                              ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30"
-                              : "bg-secondary/50 text-muted-foreground border border-border/50 hover:bg-secondary"
-                          }`}
-                          title={t.useWhisperDesc}
-                        >
-                          <Sparkles className={`w-3.5 h-3.5 ${useWhisperForYouTube ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} />
-                          <span>{t.useWhisperForYouTube}</span>
-                        </motion.button>
-                      </motion.div>
                     </motion.div>
                     
                     
