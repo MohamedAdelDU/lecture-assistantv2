@@ -31,8 +31,10 @@ export default function Home() {
   const [endMinutes, setEndMinutes] = useState("");
   const [endSeconds, setEndSeconds] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [selectedWhisperDevice, setSelectedWhisperDevice] = useState<"cpu" | "gpu">("gpu"); // Default to GPU for RunPod
-  const [selectedWhisperModel, setSelectedWhisperModel] = useState<string>("large-v3"); // Default to best model
+  // Auto-set device and model based on selectedModel
+  // When GPU mode is selected, automatically use GPU + large-v3
+  const selectedWhisperDevice: "cpu" | "gpu" = selectedModel === "gpu" ? "gpu" : "cpu";
+  const selectedWhisperModel: string = selectedModel === "gpu" ? "large-v3" : "base";
   const [useWhisperForYouTube, setUseWhisperForYouTube] = useState<boolean>(true); // Default to true - use Whisper for better quality
   const { language } = useLanguage();
 
