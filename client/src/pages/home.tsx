@@ -468,23 +468,32 @@ export default function Home() {
         }
       }
       
-      // Always use Whisper for best quality
-      console.log(`[Home] Using Whisper to transcribe YouTube video: ${videoId}`);
-      const device = selectedWhisperDevice === "gpu" ? "cuda" : "cpu";
-      const transcript = await transcribeYouTubeWithWhisper(
-        videoId,
-        selectedWhisperModel,
-        undefined, // auto-detect language
-        device,
-        startTimeSeconds,
-        endTimeSeconds,
-        user?.uid // Pass user ID for Firebase Storage
-      );
+      // Use Whisper for GPU mode, YouTube Transcript API for API mode
+      let transcript: string | null = null;
+      
+      if (selectedModel === "gpu") {
+        // GPU mode: Use Whisper for transcription
+        console.log(`[Home] Using Whisper to transcribe YouTube video: ${videoId} (GPU mode)`);
+        const device = selectedWhisperDevice === "gpu" ? "cuda" : "cpu";
+        transcript = await transcribeYouTubeWithWhisper(
+          videoId,
+          selectedWhisperModel,
+          undefined, // auto-detect language
+          device,
+          startTimeSeconds,
+          endTimeSeconds,
+          user?.uid // Pass user ID for Firebase Storage
+        );
+      } else {
+        // API mode: Use YouTube Transcript API
+        console.log(`[Home] Using YouTube Transcript API for video: ${videoId} (API mode)`);
+        transcript = await getYouTubeTranscript(videoId, startTimeSeconds, endTimeSeconds);
+      }
       
       console.log(`[Home] Transcript received:`, {
         length: transcript?.length || 0,
         preview: transcript?.substring(0, 100) || "empty",
-        method: "Whisper"
+        method: selectedModel === "gpu" ? "Whisper" : "YouTube Transcript API"
       });
       
       if (!transcript || transcript.length === 0) {
