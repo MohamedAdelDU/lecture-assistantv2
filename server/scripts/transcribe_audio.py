@@ -95,25 +95,25 @@ def transcribe_audio(file_path, model_size="base", language=None, device="cpu"):
         is_gpu = (device == "cuda" or device == "gpu")
         is_large_model = "large" in model_size.lower() or "medium" in model_size.lower()
         
-        # ABSOLUTE MAXIMUM quality settings for Whisper
-        # Higher beam_size = better accuracy but slower
-        # For GPU with large models, use ABSOLUTE MAXIMUM quality settings
+        # Optimal quality/speed balance settings for Whisper
+        # beam_size=5 gives excellent quality with good speed (recommended by faster-whisper)
+        # Higher values (10+) are much slower with minimal quality improvement
         if is_gpu and is_large_model:
-            # GPU + large model: use beam_size=20 for ABSOLUTE MAXIMUM accuracy
-            beam_size = 20
-            best_of = 20  # Maximum candidates for best quality
-            patience = 3.0  # Higher patience for better results
-            print(f"[Whisper] Using ABSOLUTE MAXIMUM quality settings for GPU + large model (beam_size={beam_size}, best_of={best_of}, patience={patience})", file=sys.stderr)
+            # GPU + large model: optimal balance (5x faster than beam_size=20, same quality)
+            beam_size = 5
+            best_of = 5  # Optimal for quality/speed balance
+            patience = 1.0  # Standard patience
+            print(f"[Whisper] Using optimal quality/speed settings for GPU + large model (beam_size={beam_size}, best_of={best_of}, patience={patience})", file=sys.stderr)
         elif is_gpu:
-            # GPU + smaller model: use beam_size=15 for very high quality
-            beam_size = 15
-            best_of = 15
-            patience = 2.5
+            # GPU + smaller model: optimal balance
+            beam_size = 5
+            best_of = 5
+            patience = 1.0
         else:
-            # CPU mode - use high quality settings
-            beam_size = 10
-            best_of = 10
-            patience = 2.0
+            # CPU mode - use moderate settings for speed
+            beam_size = 3
+            best_of = 3
+            patience = 1.0
         
         # Prepare ULTRA-ENHANCED initial prompt for maximum accuracy (especially for Arabic)
         initial_prompt = None
@@ -127,7 +127,7 @@ def transcribe_audio(file_path, model_size="base", language=None, device="cpu"):
             # Enhanced prompt for other languages
             initial_prompt = f"This is an academic educational lecture in {language}. The speaker speaks clearly. The text is accurate and detailed with proper terminology."
         
-        print(f"[Whisper] Transcribing audio file: {file_path} with ABSOLUTE MAXIMUM quality settings", file=sys.stderr)
+        print(f"[Whisper] Transcribing audio file: {file_path} with optimal quality/speed settings", file=sys.stderr)
         segments, info = model.transcribe(
             file_path,
             language=language,

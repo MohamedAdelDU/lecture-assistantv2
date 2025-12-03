@@ -139,19 +139,20 @@ class ModelHandler(BaseHTTPRequestHandler):
         is_gpu = (device == "cuda" or device == "gpu")
         is_large_model = "large" in model_size.lower() or "medium" in model_size.lower()
         
-        # ABSOLUTE MAXIMUM quality settings for Whisper
+        # Optimal quality/speed balance settings for Whisper
+        # beam_size=5 gives excellent quality with good speed (recommended by faster-whisper)
         if is_gpu and is_large_model:
-            beam_size = 20
-            best_of = 20
-            patience = 3.0
+            beam_size = 5
+            best_of = 5
+            patience = 1.0
         elif is_gpu:
-            beam_size = 15
-            best_of = 15
-            patience = 2.5
+            beam_size = 5
+            best_of = 5
+            patience = 1.0
         else:
-            beam_size = 10
-            best_of = 10
-            patience = 2.0
+            beam_size = 3
+            best_of = 3
+            patience = 1.0
         
         # Prepare ULTRA-ENHANCED initial prompt for maximum accuracy (especially for Arabic)
         initial_prompt = None
@@ -162,7 +163,7 @@ class ModelHandler(BaseHTTPRequestHandler):
         elif language and language != "None":
             initial_prompt = f"This is an academic educational lecture in {language}. The speaker speaks clearly. The text is accurate and detailed with proper terminology."
         
-        print(f"[ModelServer] Transcribing: {file_path} (beam_size={beam_size}, best_of={best_of}, patience={patience}, ABSOLUTE MAXIMUM quality)", file=sys.stderr)
+        print(f"[ModelServer] Transcribing: {file_path} (beam_size={beam_size}, best_of={best_of}, patience={patience}, optimal quality/speed)", file=sys.stderr)
         segments, info = model.transcribe(
             file_path,
             language=language,
