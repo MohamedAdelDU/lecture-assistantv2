@@ -44,7 +44,22 @@ async function buildAll() {
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
+  // Node.js built-in modules should always be external
+  const nodeBuiltins = [
+    "fs", "path", "url", "os", "crypto", "http", "https", "stream", "util", 
+    "events", "buffer", "querystring", "zlib", "net", "tls", "child_process",
+    "cluster", "dgram", "dns", "readline", "repl", "string_decoder", "timers",
+    "tty", "vm", "worker_threads"
+  ];
+  
+  // Combine node builtins with external dependencies
+  const externals = [
+    ...nodeBuiltins,
+    ...allDeps.filter((dep) => !allowlist.includes(dep))
+  ];
+  
+  // Remove duplicates
+  const uniqueExternals = [...new Set(externals)];
 
   await esbuild({
     entryPoints: ["server/index.ts"],
@@ -56,7 +71,7 @@ async function buildAll() {
       "process.env.NODE_ENV": '"production"',
     },
     minify: true,
-    external: externals,
+    external: uniqueExternals,
     logLevel: "info",
   });
 }
