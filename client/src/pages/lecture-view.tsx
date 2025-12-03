@@ -33,6 +33,7 @@ import { jsPDF } from "jspdf";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Cpu, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function LectureView() {
   const { id } = useParams();
@@ -599,29 +600,106 @@ export default function LectureView() {
 
             <div className="min-h-[500px]">
               <TabsContent value="transcript" className="mt-0 animate-in fade-in-50 duration-300">
-                <TranscriptView text={lecture.transcript || "No transcript available."} title={lecture.title} />
+                {lecture.status === "processing" && !lecture.transcript ? (
+                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                    <Spinner className="w-8 h-8 text-primary" />
+                    <p className="text-muted-foreground text-sm">
+                      {language === "ar" ? "جاري تحويل الصوت إلى نص..." : "Transcribing audio..."}
+                    </p>
+                  </div>
+                ) : (
+                  <TranscriptView text={lecture.transcript || "No transcript available."} title={lecture.title} />
+                )}
               </TabsContent>
               
               <TabsContent value="summary" className="mt-0 animate-in fade-in-50 duration-300">
-                <SummaryView summary={lecture.summary || []} title={lecture.title} />
+                {lecture.status === "processing" && (!lecture.summary || (Array.isArray(lecture.summary) && lecture.summary.length === 0) || (typeof lecture.summary === "string" && lecture.summary.trim().length === 0)) ? (
+                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                    <Spinner className="w-8 h-8 text-primary" />
+                    <p className="text-muted-foreground text-sm">
+                      {language === "ar" ? "جاري إنشاء الملخص..." : "Generating summary..."}
+                    </p>
+                    {lecture.progress !== undefined && (
+                      <div className="w-full max-w-md space-y-2">
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                          <div className="bg-primary h-full transition-all duration-300" style={{ width: `${Math.min(lecture.progress, 50)}%` }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">{lecture.progress}%</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <SummaryView summary={lecture.summary || []} title={lecture.title} />
+                )}
               </TabsContent>
               
               <TabsContent value="quiz" className="mt-0 animate-in fade-in-50 duration-300">
-                <QuizView questions={lecture.questions || []} title={lecture.title} />
+                {lecture.status === "processing" && (!lecture.questions || lecture.questions.length === 0) ? (
+                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                    <Spinner className="w-8 h-8 text-primary" />
+                    <p className="text-muted-foreground text-sm">
+                      {language === "ar" ? "جاري إنشاء الأسئلة..." : "Generating quiz questions..."}
+                    </p>
+                    {lecture.progress !== undefined && (
+                      <div className="w-full max-w-md space-y-2">
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                          <div className="bg-primary h-full transition-all duration-300" style={{ width: `${Math.min(lecture.progress, 60)}%` }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">{lecture.progress}%</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <QuizView questions={lecture.questions || []} title={lecture.title} />
+                )}
               </TabsContent>
               
               <TabsContent value="slides" className="mt-0 animate-in fade-in-50 duration-300">
-                <SlidesView
-                  slides={lecture.slides || []}
-                  title={lecture.title}
-                  transcript={lecture.transcript}
-                  summary={lecture.summary}
-                  lectureId={lecture.id}
-                />
+                {lecture.status === "processing" && (!lecture.slides || lecture.slides.length === 0) ? (
+                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                    <Spinner className="w-8 h-8 text-primary" />
+                    <p className="text-muted-foreground text-sm">
+                      {language === "ar" ? "جاري إنشاء الشرائح..." : "Generating slides..."}
+                    </p>
+                    {lecture.progress !== undefined && (
+                      <div className="w-full max-w-md space-y-2">
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                          <div className="bg-primary h-full transition-all duration-300" style={{ width: `${Math.min(lecture.progress, 80)}%` }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">{lecture.progress}%</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <SlidesView
+                    slides={lecture.slides || []}
+                    title={lecture.title}
+                    transcript={lecture.transcript}
+                    summary={lecture.summary}
+                    lectureId={lecture.id}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="flashcards" className="mt-0 animate-in fade-in-50 duration-300">
-                <FlashcardsView flashcards={lecture?.flashcards} />
+                {lecture.status === "processing" && (!lecture.flashcards || lecture.flashcards.length === 0) ? (
+                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                    <Spinner className="w-8 h-8 text-primary" />
+                    <p className="text-muted-foreground text-sm">
+                      {language === "ar" ? "جاري إنشاء البطاقات التعليمية..." : "Generating flashcards..."}
+                    </p>
+                    {lecture.progress !== undefined && (
+                      <div className="w-full max-w-md space-y-2">
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                          <div className="bg-primary h-full transition-all duration-300" style={{ width: `${Math.min(lecture.progress, 100)}%` }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">{lecture.progress}%</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <FlashcardsView flashcards={lecture?.flashcards} />
+                )}
               </TabsContent>
             </div>
           </Tabs>
