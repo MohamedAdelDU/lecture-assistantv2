@@ -11,6 +11,7 @@ import pptxgen from "pptxgenjs";
 import multer from "multer";
 import os from "os";
 import { uploadAudioToFirebase, checkAudioExists, downloadAudioFromFirebase } from "./firebaseStorage";
+import { getModelServerUrl, isModelServerRunning } from "./modelServer";
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
