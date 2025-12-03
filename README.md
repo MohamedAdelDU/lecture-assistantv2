@@ -12,7 +12,7 @@ A web application that analyzes YouTube lecture videos using AI to generate summ
 - 🎴 **Flashcards**: Study cards for key concepts
 - 🌐 **Multi-language Support**: Full Arabic/English support with RTL/LTR layout and automatic language detection
 - 🎨 **Customizable Themes**: Multiple slide themes with unique fonts and color suggestions
-- 🔧 **Model Selection**: Choose between GPU (Ollama) and Cloud (Gemini API) models
+- 🔧 **Model Selection**: Choose between GPU (Qwen) and Cloud (Gemini API) models
 - 🔐 **Authentication**: Firebase Auth with email/password and Google Sign-in
 - 💾 **Cloud Storage**: Firebase Firestore for data persistence
 - 📥 **Export Options**: Download slides as PowerPoint (.pptx) files with full Arabic support
@@ -23,7 +23,7 @@ A web application that analyzes YouTube lecture videos using AI to generate summ
 - **Backend**: Node.js, Express
 - **AI Models**: 
   - Google Gemini 2.5 Flash (Cloud API)
-  - Ollama with Qwen2.5:7b (Local GPU)
+  - Qwen/Qwen2.5-3B-Instruct (Local GPU via transformers)
 - **Database**: Firebase Firestore
 - **Authentication**: Firebase Auth
 - **Hosting**: Firebase Hosting
@@ -47,9 +47,9 @@ A web application that analyzes YouTube lecture videos using AI to generate summ
    Create a `.env` file in the root directory:
    ```env
    GEMINI_API_KEY=your_gemini_api_key
-   OLLAMA_URL=http://localhost:11434
-   OLLAMA_MODEL=qwen2.5:7b
    ```
+   
+   Note: Qwen model runs directly via transformers, no additional configuration needed.
 
 4. **Set up Firebase**
    - Create a Firebase project
@@ -63,7 +63,10 @@ A web application that analyzes YouTube lecture videos using AI to generate summ
    
    Required Python packages:
    - `youtube-transcript-api`: For extracting YouTube video transcripts
-   - `python-dotenv`: For environment variable management
+   - `faster-whisper`: For audio transcription
+   - `transformers`: For Qwen model (AI summaries and quizzes)
+   - `torch`: For GPU acceleration (with CUDA support)
+   - `accelerate`: For optimized model loading
 
 6. **Configure Python path** (if needed)
    Ensure Python is accessible from your system PATH, or update the Python path in `server/routes.ts` if using a custom Python installation.
@@ -78,7 +81,7 @@ Select specific time ranges from YouTube videos to extract transcripts. This is 
 
 ### Model Selection
 Choose between two AI models:
-- **LM-Titan (GPU)**: Local Ollama model running on your GPU for faster processing
+- **LM-Titan (GPU)**: Local Qwen model running on your GPU for faster processing
 - **LM-Cloud (API)**: Google Gemini API for cloud-based processing
 
 ### Slide Themes
@@ -169,7 +172,8 @@ The backend API endpoints need to be deployed separately. Options:
 
 ### AI Model Errors
 - **Gemini API**: Check your API key and quota limits
-- **Ollama**: Ensure Ollama is running locally on port 11434
+- **Qwen GPU**: Ensure PyTorch with CUDA support is installed and GPU is available
+- **Qwen CPU**: Works automatically but slower than GPU
 - Model fallback: The app will automatically fallback to available models
 
 ### PowerPoint Download Issues

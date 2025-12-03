@@ -29,9 +29,11 @@ sudo apt-get upgrade -y
 
 # تثبيت Python dependencies
 pip install --upgrade pip
-pip install faster-whisper torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-# تثبيت متطلبات المشروع
+# تثبيت PyTorch مع دعم CUDA
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# تثبيت متطلبات المشروع (يشمل transformers, accelerate, faster-whisper)
 pip install -r requirements.txt
 ```
 
@@ -43,6 +45,9 @@ python3 -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()}');
 
 # التحقق من faster-whisper
 python3 -c "from faster_whisper import WhisperModel; print('faster-whisper installed successfully')"
+
+# التحقق من transformers و Qwen
+python3 -c "from transformers import AutoTokenizer, AutoModelForCausalLM; print('transformers installed successfully')"
 ```
 
 ### 4. إعداد المتغيرات البيئية
@@ -58,15 +63,22 @@ PYTHON_CMD=python3
 
 # Other settings
 GEMINI_API_KEY=your_key_here
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b
+
+# Python Path (if needed)
+PYTHON_CMD=python3
 ```
 
-### 5. اختبار التحويل الصوتي
+### 5. اختبار الموديلات
 
 ```bash
-# اختبار بسيط
+# اختبار التحويل الصوتي
 python3 server/scripts/transcribe_audio.py /path/to/audio.mp3 large-v3 None cuda
+
+# اختبار توليد الملخص (Qwen)
+python3 server/scripts/generate_summary.py "This is a test transcript for summary generation." cuda
+
+# اختبار توليد الأسئلة (Qwen)
+python3 server/scripts/generate_quiz.py "This is a test transcript for quiz generation. It contains important information about the topic." cuda
 ```
 
 ## الإعدادات الموصى بها
@@ -91,13 +103,23 @@ python3 server/scripts/transcribe_audio.py /path/to/audio.mp3 large-v3 None cuda
 
 المشروع يستخدم تلقائياً `float16` للـ GPU للحصول على أفضل أداء.
 
-### 2. تحميل الموديل مسبقاً
+### 2. تحميل الموديلات مسبقاً
 
-عند أول استخدام، سيتم تحميل الموديل تلقائياً. يمكنك تحميله مسبقاً:
+عند أول استخدام، سيتم تحميل الموديلات تلقائياً. يمكنك تحميلها مسبقاً:
 
 ```python
+# تحميل Whisper
 from faster_whisper import WhisperModel
-model = WhisperModel("large-v3", device="cuda", compute_type="float16")
+whisper_model = WhisperModel("large-v3", device="cuda", compute_type="float16")
+
+# تحميل Qwen
+from transformers import AutoTokenizer, AutoModelForCausalLM
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B-Instruct")
+qwen_model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen2.5-3B-Instruct",
+    torch_dtype=torch.float16,
+    device_map="auto"
+)
 ```
 
 ### 3. استخدام Batch Processing
@@ -134,10 +156,12 @@ python3 -c "from faster_whisper import WhisperModel; WhisperModel('large-v3', de
 
 ## ملاحظات مهمة
 
-1. **الموديل الافتراضي**: `large-v3` (الأفضل دقة)
-2. **الجهاز الافتراضي**: GPU (cuda)
-3. **Compute Type**: float16 للـ GPU (أفضل أداء)
-4. **التحميل التلقائي**: الموديلات تُحمّل تلقائياً عند أول استخدام
+1. **Whisper Model**: `large-v3` (الأفضل دقة للتحويل الصوتي)
+2. **Qwen Model**: `Qwen/Qwen2.5-3B-Instruct` (للملخصات والأسئلة)
+3. **الجهاز الافتراضي**: GPU (cuda)
+4. **Compute Type**: float16 للـ GPU (أفضل أداء)
+5. **التحميل التلقائي**: الموديلات تُحمّل تلقائياً عند أول استخدام
+6. **Qwen يحتاج**: ~6GB RAM عند التحميل
 
 ## الأداء المتوقع
 
@@ -153,9 +177,21 @@ python3 -c "from faster_whisper import WhisperModel; WhisperModel('large-v3', de
 - **medium**: ~3-5x أسرع من الوقت الفعلي للصوت
 - **base**: ~5-10x أسرع من الوقت الفعلي للصوت
 
+## الأداء المتوقع لـ Qwen
+
+### على A100 40GB:
+- **توليد الملخص**: ~3-8 ثواني
+- **توليد الأسئلة**: ~5-15 ثانية
+
+### على RTX 3090:
+- **توليد الملخص**: ~5-15 ثانية
+- **توليد الأسئلة**: ~10-30 ثانية
+
 ## الدعم
 
 إذا واجهت أي مشاكل، راجع:
 - [faster-whisper Documentation](https://github.com/guillaumekln/faster-whisper)
+- [Transformers Documentation](https://huggingface.co/docs/transformers)
+- [Qwen Model Card](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct)
 - [RunPod Documentation](https://docs.runpod.io/)
 

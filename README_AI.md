@@ -1,71 +1,117 @@
 # دليل استخدام AI Models
 
-## استخدام موديل محلي بدون API (Ollama)
+## استخدام موديل محلي بدون API (Qwen)
 
-### 1. تثبيت Ollama
+### 1. تثبيت المكتبات المطلوبة
 
-**Windows:**
-- حمّل من: https://ollama.ai/download
-- أو استخدم: `winget install Ollama.Ollama`
-
-**Mac:**
-```bash
-brew install ollama
-```
-
-**Linux:**
-```bash
-curl -fsSL https://ollama.ai/install.sh | sh
-```
-
-### 2. تشغيل Ollama
+**تثبيت Python dependencies:**
 
 ```bash
-ollama serve
+pip install transformers torch accelerate
 ```
 
-### 3. تحميل موديل
+**للاستفادة من GPU (CUDA):**
 
 ```bash
-# موديلات موصى بها:
-ollama pull llama2          # موديل عام (7B)
-ollama pull mistral         # موديل أفضل (7B)
-ollama pull llama2:13b      # موديل أكبر (13B) - يحتاج RAM أكثر
-ollama pull codellama       # للكود
+# تثبيت PyTorch مع دعم CUDA
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
-### 4. إعداد Environment Variables (اختياري)
+### 2. التحقق من توفر GPU
 
-أنشئ ملف `.env` في جذر المشروع:
-
-```env
-# Ollama Configuration
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama2
-
-# أو استخدم OpenAI (إذا كان متوفر)
-OPENAI_API_KEY=sk-your-key-here
+```bash
+python3 -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
 ```
 
-### 5. الأولوية في الاستخدام
+### 3. الموديل المستخدم
+
+المشروع يستخدم **Qwen/Qwen2.5-3B-Instruct** مباشرة عبر `transformers`:
+- يعمل على GPU مباشرة (CUDA) إذا كان متوفراً
+- يعمل على CPU كبديل تلقائي
+- يدعم العربية والإنجليزية بشكل ممتاز
+- يتم تحميله تلقائياً عند أول استخدام
+
+### 4. الأولوية في الاستخدام
 
 الكود سيستخدم بالترتيب:
-1. **Ollama** (إذا كان يعمل) - مجاني ومحلي
-2. **OpenAI** (إذا كان API key موجود) - يحتاج دفع
+1. **Gemini API** (إذا كان API key موجود وليس GPU mode) - جودة عالية
+2. **Qwen GPU** (إذا كان GPU mode مفعّل) - مجاني ومحلي وسريع
 3. **Simple Summary** (fallback) - بدون AI
+
+### 5. استخدام GPU Mode
+
+للاستفادة من Qwen على GPU:
+1. تأكد من تثبيت PyTorch مع دعم CUDA
+2. تأكد من توفر GPU (NVIDIA مع CUDA)
+3. اختر "LM-Titan (GPU)" في واجهة المستخدم
+4. سيتم استخدام Qwen تلقائياً على GPU
+
+### 6. استخدام API Mode
+
+للاستفادة من Gemini API:
+1. احصل على Gemini API Key من [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. أضف المفتاح إلى `.env`:
+   ```env
+   GEMINI_API_KEY=your_key_here
+   ```
+3. اختر "LM-Cloud (API)" في واجهة المستخدم
 
 ## ملاحظات
 
-- Ollama يعمل محلياً، لا يحتاج إنترنت بعد تحميل الموديل
-- الموديلات تحتاج RAM (7B يحتاج ~8GB RAM)
-- يمكن استخدام موديلات أصغر إذا كان RAM محدود
-- الموديلات تدعم العربية بشكل جيد
+- Qwen يعمل محلياً، لا يحتاج إنترنت بعد تحميل الموديل
+- الموديل يحتاج ~6GB RAM عند التحميل
+- على GPU، يعمل بشكل أسرع بكثير من CPU
+- الموديل يدعم العربية والإنجليزية بشكل ممتاز
+- يتم تحميل الموديل تلقائياً عند أول استخدام (قد يستغرق بضع دقائق)
 
 ## استكشاف الأخطاء
 
-إذا لم يعمل Ollama:
-1. تأكد أن `ollama serve` يعمل
-2. تحقق من `http://localhost:11434/api/tags`
-3. تأكد من تحميل موديل: `ollama list`
-4. راجع logs في console
+### المشكلة: CUDA not available
 
+**الحل:**
+```bash
+# التحقق من CUDA
+nvidia-smi
+
+# إعادة تثبيت PyTorch مع CUDA
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+### المشكلة: Out of Memory
+
+**الحل:**
+- استخدم CPU mode بدلاً من GPU
+- تأكد من وجود RAM كافٍ (~8GB+)
+- أغلق التطبيقات الأخرى التي تستخدم GPU
+
+### المشكلة: Model download failed
+
+**الحل:**
+```bash
+# تحميل الموديل يدوياً
+python3 -c "from transformers import AutoTokenizer, AutoModelForCausalLM; AutoTokenizer.from_pretrained('Qwen/Qwen2.5-3B-Instruct'); AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-3B-Instruct')"
+```
+
+### المشكلة: transformers not installed
+
+**الحل:**
+```bash
+pip install transformers torch accelerate
+```
+
+## الأداء المتوقع
+
+### على GPU (RTX 3090 أو أفضل):
+- **توليد الملخص**: ~5-15 ثانية
+- **توليد الأسئلة**: ~10-30 ثانية
+
+### على CPU:
+- **توليد الملخص**: ~30-60 ثانية
+- **توليد الأسئلة**: ~60-120 ثانية
+
+## الدعم
+
+إذا واجهت أي مشاكل، راجع:
+- [Transformers Documentation](https://huggingface.co/docs/transformers)
+- [Qwen Model Card](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct)
+- [PyTorch CUDA Installation](https://pytorch.org/get-started/locally/)

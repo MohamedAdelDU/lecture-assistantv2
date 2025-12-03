@@ -63,7 +63,7 @@ export default function Home() {
     seconds: language === "ar" ? "ثواني" : "sec",
     modelGpu: language === "ar" ? "LM-Titan (GPU)" : "LM-Titan (GPU)",
     modelApi: language === "ar" ? "LM-Cloud (API)" : "LM-Cloud (API)",
-    modelGpuDesc: language === "ar" ? "يعمل على الموديلات المحلية المعتمدة على GPU (Ollama)" : "Runs on local GPU-based models (Ollama)",
+    modelGpuDesc: language === "ar" ? "يعمل على الموديلات المحلية المعتمدة على GPU (Qwen)" : "Runs on local GPU-based models (Qwen)",
     modelApiDesc: language === "ar" ? "يعمل على API السحابي (Gemini)" : "Runs on cloud API (Gemini)",
     modelGpuTooltip: language === "ar" 
       ? "يستخدم موديلات محلية تعمل على GPU الخاص بك. أسرع وأكثر خصوصية، لكن يتطلب GPU قوي."
@@ -1265,7 +1265,7 @@ export default function Home() {
                           </li>
                           <li className="flex items-start gap-2">
                             <span className="text-amber-500 mt-1">•</span>
-                            <span>{language === "ar" ? "تثبيت Ollama على الجهاز" : "Ollama installed locally"}</span>
+                            <span>{language === "ar" ? "تثبيت transformers و torch مع دعم CUDA" : "Install transformers and torch with CUDA support"}</span>
                           </li>
                         </ul>
                       </div>

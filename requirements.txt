@@ -2,6 +2,11 @@ youtube-transcript-api>=0.6.0
 faster-whisper>=1.0.0
 yt-dlp>=2024.0.0
 
+# AI Model Libraries (for Qwen/Qwen2.5-3B-Instruct)
+transformers>=4.35.0
+torch>=2.0.0
+accelerate>=0.24.0
+
 # Optional: For GPU detection and better performance on RunPod
 # Install PyTorch with CUDA support:
 # pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118

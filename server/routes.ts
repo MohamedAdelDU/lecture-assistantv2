@@ -16,6 +16,30 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Helper function to get the correct Python command based on OS
+function getPythonCommand(): string {
+  // Check for custom Python command from environment
+  if (process.env.PYTHON_CMD) {
+    return process.env.PYTHON_CMD;
+  }
+  
+  // Check for venv Python
+  const venvPython = path.join(__dirname, "..", "venv", "bin", "python3");
+  if (existsSync(venvPython)) {
+    return venvPython;
+  }
+  
+  // Check for Windows venv
+  const venvPythonWindows = path.join(__dirname, "..", "venv", "Scripts", "python.exe");
+  if (existsSync(venvPythonWindows)) {
+    return venvPythonWindows;
+  }
+  
+  // Use platform-specific default
+  // On Windows, use 'python', on Unix-like systems use 'python3'
+  return process.platform === "win32" ? "python" : "python3";
+}
+
 // Configure multer for file uploads
 const uploadDir = path.join(os.tmpdir(), "lecture-assistant-uploads");
 if (!existsSync(uploadDir)) {
@@ -85,9 +109,7 @@ export async function registerRoutes(
       console.log(`[API] Fetching video info for: ${videoId}`);
 
       try {
-        // Allow custom python command via env, fallback to venv python, then python3
-        const venvPython = path.join(__dirname, "..", "venv", "bin", "python3");
-        const pythonCmd = process.env.PYTHON_CMD || (existsSync(venvPython) ? venvPython : "python3");
+        const pythonCmd = getPythonCommand();
         const pythonScript = path.join(__dirname, "scripts", "get_video_info.py");
         const { stdout, stderr } = await execAsync(
           `${pythonCmd} "${pythonScript}" "${videoId}"`,
@@ -155,9 +177,7 @@ export async function registerRoutes(
         const pythonScript = path.join(__dirname, "scripts", "get_transcript.py");
 
         // Build command with optional time parameters
-        // Use venv python if available, otherwise fallback to python3
-        const venvPython = path.join(__dirname, "..", "venv", "bin", "python3");
-        const pythonCmd = process.env.PYTHON_CMD || (existsSync(venvPython) ? venvPython : "python3");
+        const pythonCmd = getPythonCommand();
         let command = `${pythonCmd} "${pythonScript}" "${videoId}"`;
         if (startTimeSeconds !== null) {
           command += ` "${startTimeSeconds}"`;
@@ -272,8 +292,7 @@ export async function registerRoutes(
 
       try {
         // Get Python command (needed for both download and transcription)
-        const venvPython = path.join(__dirname, "..", "venv", "bin", "python3");
-        const pythonCmd = process.env.PYTHON_CMD || (existsSync(venvPython) ? venvPython : "python3");
+        const pythonCmd = getPythonCommand();
         
         // Step 1: Download audio from YouTube (if not found in Firebase)
         if (!downloadedFilePath) {
@@ -438,8 +457,7 @@ export async function registerRoutes(
 
       try {
         const pythonScript = path.join(__dirname, "scripts", "transcribe_audio.py");
-        const venvPython = path.join(__dirname, "..", "venv", "bin", "python3");
-        const pythonCmd = process.env.PYTHON_CMD || (existsSync(venvPython) ? venvPython : "python3");
+        const pythonCmd = getPythonCommand();
         
         // Build command with parameters
         let command = `${pythonCmd} "${pythonScript}" "${uploadedFilePath}" "${modelSize}"`;
@@ -520,8 +538,8 @@ export async function registerRoutes(
   /**
    * AI Summary endpoint
    * Priority:
-   * 1) Gemini API (GEMINI_API_KEY)
-   * 2) Ollama local model (OLLAMA_URL, OLLAMA_MODEL)
+   * 1) Gemini API (GEMINI_API_KEY) - if not GPU mode
+   * 2) Qwen GPU model (via Python script) - if GPU mode
    * 3) Simple text-based fallback
    */
   app.post("/api/ai/summary", async (req: Request, res: Response) => {
@@ -752,120 +770,50 @@ ${transcript.substring(0, 20000)}`,
 
           console.error("[API] Gemini API error:", geminiError);
 
-          // fall through to Ollama / fallback
+          // fall through to Qwen GPU / fallback
 
         }
 
       }
 
-      // Priority 2: Ollama (local AI model) - only if not forcing API-only
-
-      const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-
-      const ollamaModel = process.env.OLLAMA_MODEL || "llama2";
-
-      try {
-
-        if (isApiMode) {
-
-          throw new Error("Skipping Ollama in API mode");
-
-        }
-
-        const ollamaCheck = await fetch(`${ollamaUrl}/api/tags`, {
-
-          method: "GET",
-
-          signal: AbortSignal.timeout(2000),
-
-        });
-
-        if (ollamaCheck.ok) {
-
-          console.log(`[API] Using Ollama model: ${ollamaModel}`);
-
-          const ollamaResponse = await fetch(`${ollamaUrl}/api/generate`, {
-
-            method: "POST",
-
-            headers: {
-
-              "Content-Type": "application/json",
-
-            },
-
-            body: JSON.stringify({
-
-              model: ollamaModel,
-
-              prompt: `You are an academic lecture summarizer. Your task is to create a comprehensive summary of the lecture.
-
-Requirements:
-
-- Summarize the transcript in the SAME language it is written in.
-
-- Write continuous paragraphs (no bullets, no numbering, no JSON).
-
-- Focus on the real content, not meta-comments.
-
-Transcript:
-
-${transcript}`,
-
-              stream: false,
-
-              options: {
-
-                temperature: 0.7,
-
-                num_predict: 1000,
-
-              },
-
-            }),
-
-          });
-
-          if (ollamaResponse.ok) {
-
-            const ollamaData = await ollamaResponse.json();
-
-            const aiResponse: string = (ollamaData.response || "").trim();
-
-            if (aiResponse) {
-
-              // Return as a single long-form text (abstractive summary)
-
-              let summaryText = aiResponse
-
-                .replace(/^(Summary|Transcript|Note|Important):\s*/i, "")
-
-                .replace(/\n{3,}/g, "\n\n")
-
-                .trim();
-
-              if (summaryText.length > 100) {
-
-                console.log(
-
-                  `[API] Ollama abstractive summary generated (${summaryText.length} characters)`,
-
-                );
-
-                return res.json({ summary: summaryText });
-
-              }
-
-            }
-
+      // Priority 2: Qwen GPU (local AI model) - only if GPU mode is requested
+      if (isGpuMode) {
+        try {
+          console.log("[API] Using Qwen GPU model for summary generation");
+          
+          const pythonCmd = getPythonCommand();
+          const pythonScript = path.join(__dirname, "scripts", "generate_summary.py");
+          
+          // Escape transcript for command line (handle quotes and special characters)
+          const escapedTranscript = transcript.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+          
+          const command = `${pythonCmd} "${pythonScript}" "${escapedTranscript}" "cuda"`;
+          
+          const { stdout, stderr } = await execAsync(command);
+          
+          if (stderr) {
+            console.error(`[API] Python stderr (summary):`, stderr);
           }
-
+          
+          const result = JSON.parse(stdout.trim());
+          
+          if (result.success && result.summary) {
+            const summaryText = result.summary.trim();
+            
+            if (summaryText.length > 100) {
+              console.log(
+                `[API] Qwen GPU summary generated (${summaryText.length} characters)`,
+              );
+              return res.json({ summary: summaryText });
+            }
+          } else {
+            console.error("[API] Qwen GPU summary generation failed:", result.error || "Unknown error");
+            // Fall through to fallback
+          }
+        } catch (qwenError: any) {
+          console.error("[API] Qwen GPU error:", qwenError);
+          // Fall through to fallback
         }
-
-      } catch (ollamaError: any) {
-
-        console.error("[API] Ollama not available or error:", ollamaError);
-
       }
 
       // Priority 3: Simple text-based fallback (no external AI)
@@ -1010,6 +958,53 @@ ${transcript.substring(0, 30000)}`;
           }
         } catch (geminiError: any) {
           console.error("[API] Gemini API error for quiz:", geminiError);
+          // Fall through to Qwen GPU / fallback
+        }
+      }
+
+      // Priority 2: Qwen GPU (local AI model) - only if GPU mode is requested
+      if (isGpuMode) {
+        try {
+          console.log("[API] Using Qwen GPU model for quiz generation");
+          
+          const pythonCmd = getPythonCommand();
+          const pythonScript = path.join(__dirname, "scripts", "generate_quiz.py");
+          
+          // Escape transcript for command line (handle quotes and special characters)
+          const escapedTranscript = transcript.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+          
+          const command = `${pythonCmd} "${pythonScript}" "${escapedTranscript}" "cuda"`;
+          
+          const { stdout, stderr } = await execAsync(command);
+          
+          if (stderr) {
+            console.error(`[API] Python stderr (quiz):`, stderr);
+          }
+          
+          const result = JSON.parse(stdout.trim());
+          
+          if (result.success && result.questions && Array.isArray(result.questions) && result.questions.length > 0) {
+            // Validate and format questions
+            const validQuestions = result.questions
+              .filter((q: any) => q.text && q.options && Array.isArray(q.options) && q.options.length >= 2 && typeof q.correctIndex === "number")
+              .map((q: any, index: number) => ({
+                id: index + 1,
+                text: q.text.trim(),
+                options: q.options.slice(0, 4).map((opt: string) => opt.trim()), // Ensure max 4 options
+                correctIndex: Math.min(q.correctIndex, q.options.length - 1), // Ensure valid index
+                type: q.type || "multiple-choice",
+              }));
+
+            if (validQuestions.length > 0) {
+              console.log(`[API] Qwen GPU quiz generated with ${validQuestions.length} questions`);
+              return res.json({ questions: validQuestions });
+            }
+          } else {
+            console.error("[API] Qwen GPU quiz generation failed:", result.error || "Unknown error");
+            // Fall through to fallback
+          }
+        } catch (qwenError: any) {
+          console.error("[API] Qwen GPU error for quiz:", qwenError);
           // Fall through to fallback
         }
       }
