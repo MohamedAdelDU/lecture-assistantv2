@@ -397,7 +397,7 @@ export default function Home() {
         console.error("[Home] Error processing audio file:", error);
         await updateLecture({
           lectureId,
-          updates: { status: "error", progress: 0 },
+          updates: { status: "failed", progress: 0 },
         });
         toast({
           title: "Error",
@@ -887,49 +887,6 @@ export default function Home() {
                       </motion.div>
                       
                     </motion.div>
-                    
-                    
-                    {/* Whisper Device Selection (shown when file is uploaded) */}
-                    {uploadedFile && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className={`flex items-center gap-3 px-2 ${language === "ar" ? "flex-row-reverse" : ""}`}
-                      >
-                        <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{t.selectWhisperDevice}:</span>
-                        <div className={`flex gap-2 flex-1 ${language === "ar" ? "flex-row-reverse" : ""}`}>
-                          <motion.button
-                            type="button"
-                            onClick={() => setSelectedWhisperDevice("cpu")}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                              selectedWhisperDevice === "cpu"
-                                ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30"
-                                : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
-                            }`}
-                          >
-                            <Cpu className="w-4 h-4" />
-                            <span>{t.whisperCpu}</span>
-                          </motion.button>
-                          <motion.button
-                            type="button"
-                            onClick={() => setSelectedWhisperDevice("gpu")}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                              selectedWhisperDevice === "gpu"
-                                ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30"
-                                : "bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/50"
-                            }`}
-                          >
-                            <Cpu className="w-4 h-4" />
-                            <span>{t.whisperGpu}</span>
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    )}
                     {/* Time Range Inputs */}
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
