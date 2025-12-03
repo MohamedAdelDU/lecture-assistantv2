@@ -395,7 +395,7 @@ export async function registerRoutes(
           console.log(`[API] Audio downloaded successfully: ${downloadedFilePath} (${(downloadResult.fileSize / 1024 / 1024).toFixed(2)} MB)`);
 
           // Upload to Firebase Storage (only if no time range specified)
-          if (startTimeSeconds === null && endTimeSeconds === null && userId !== "anonymous") {
+          if (startTimeSeconds === null && endTimeSeconds === null && userId !== "anonymous" && downloadedFilePath) {
             try {
               audioUrl = await uploadAudioToFirebase(downloadedFilePath, userId, videoId);
               console.log(`[API] Audio uploaded to Firebase Storage: ${audioUrl}`);
@@ -407,6 +407,13 @@ export async function registerRoutes(
         }
 
         // Step 2: Transcribe using Whisper
+        if (!downloadedFilePath) {
+          return res.status(500).json({
+            error: "No audio file available for transcription",
+            details: "Failed to download or retrieve audio file.",
+          });
+        }
+        
         const transcribeScript = path.join(getScriptsDir(), "transcribe_audio.py");
         
         let transcribeCommand = `${pythonCmd} "${transcribeScript}" "${downloadedFilePath}" "${modelSize}"`;
