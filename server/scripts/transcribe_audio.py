@@ -7,6 +7,7 @@ import sys
 import json
 import os
 from faster_whisper import WhisperModel
+from model_cache import get_whisper_model
 
 # Try to import torch for GPU detection (optional, won't fail if not available)
 try:
@@ -66,25 +67,26 @@ def transcribe_audio(file_path, model_size="base", language=None, device="cpu"):
                         print(f"[Whisper] GPU Memory: {torch_module.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB", file=sys.stderr)
                     except:
                         pass  # Skip GPU info if not available
-                model = WhisperModel(model_size, device="cuda", compute_type="float16")
-                print(f"[Whisper] Model loaded successfully on GPU with float16", file=sys.stderr)
+                # Use cached model if available
+                model = get_whisper_model(model_size, device="cuda", compute_type="float16")
+                print(f"[Whisper] Model ready on GPU with float16", file=sys.stderr)
             except Exception as e:
                 print(f"[Whisper] float16 not available, trying int8_float16: {e}", file=sys.stderr)
                 try:
                     # Fallback to int8_float16 (still uses GPU)
-                    model = WhisperModel(model_size, device="cuda", compute_type="int8_float16")
-                    print(f"[Whisper] Model loaded successfully on GPU with int8_float16", file=sys.stderr)
+                    model = get_whisper_model(model_size, device="cuda", compute_type="int8_float16")
+                    print(f"[Whisper] Model ready on GPU with int8_float16", file=sys.stderr)
                 except Exception as e2:
                     print(f"[Whisper] GPU initialization failed, falling back to CPU: {e2}", file=sys.stderr)
                     # Fallback to CPU if GPU fails
-                    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+                    model = get_whisper_model(model_size, device="cpu", compute_type="int8")
         elif (device == "cuda" or device == "gpu") and not cuda_available:
             print(f"[Whisper] GPU requested but CUDA not available, falling back to CPU", file=sys.stderr)
-            model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            model = get_whisper_model(model_size, device="cpu", compute_type="int8")
         else:
             # CPU mode
             print(f"[Whisper] Loading model: {model_size} on CPU", file=sys.stderr)
-            model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            model = get_whisper_model(model_size, device="cpu", compute_type="int8")
         
         # Transcribe audio
         # Optimize settings based on device and model size

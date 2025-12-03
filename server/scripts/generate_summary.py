@@ -40,21 +40,13 @@ def generate_summary(transcript, device="cuda"):
         else:
             print(f"[Qwen] Using CPU", file=sys.stderr)
         
-        # Load model and tokenizer
-        model_name = "Qwen/Qwen2.5-3B-Instruct"
-        print(f"[Qwen] Loading model: {model_name} on {device}", file=sys.stderr)
+        # Load model and tokenizer (use cache)
+        from model_cache import get_qwen_model
+        print(f"[Qwen] Loading model: Qwen/Qwen2.5-3B-Instruct on {device}", file=sys.stderr)
         
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            device_map="auto" if device == "cuda" else None,
-        )
+        model, tokenizer = get_qwen_model(device=device)
         
-        if device == "cpu":
-            model = model.to(device)
-        
-        print(f"[Qwen] Model loaded successfully", file=sys.stderr)
+        print(f"[Qwen] Model ready", file=sys.stderr)
         
         # Detect language
         has_arabic = any('\u0600' <= char <= '\u06FF' for char in transcript)
