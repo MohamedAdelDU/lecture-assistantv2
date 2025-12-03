@@ -457,25 +457,56 @@ export default function Home() {
         }
       }
       
-      // Always use Whisper for transcription (YouTube Transcript API is blocked on cloud providers)
-      // Mode only affects AI generation (Qwen vs Gemini), not transcription
-      console.log(`[Home] Using Whisper to transcribe YouTube video: ${videoId} (device: ${selectedWhisperDevice})`);
-      const device = selectedWhisperDevice === "gpu" ? "cuda" : "cpu";
-      const transcript = await transcribeYouTubeWithWhisper(
-        videoId,
-        selectedWhisperModel,
-        undefined, // auto-detect language
-        device,
-        startTimeSeconds,
-        endTimeSeconds,
-        user?.uid // Pass user ID for Firebase Storage
-      );
+      // Use YouTube Transcript API for API mode, Whisper for GPU mode
+      // If YouTube Transcript API fails (blocked), fallback to Whisper
+      let transcript: string | null = null;
+      
+      if (selectedModel === "api") {
+        // API mode: Try YouTube Transcript API first
+        try {
+          console.log(`[Home] Using YouTube Transcript API for video: ${videoId} (API mode)`);
+          transcript = await getYouTubeTranscript(videoId, startTimeSeconds, endTimeSeconds);
+          console.log(`[Home] YouTube Transcript API success:`, {
+            length: transcript?.length || 0,
+            preview: transcript?.substring(0, 100) || "empty"
+          });
+        } catch (error: any) {
+          // If YouTube Transcript API fails (blocked IP), fallback to Whisper
+          console.warn(`[Home] YouTube Transcript API failed (${error.message}), falling back to Whisper`);
+          const device = "cpu"; // Use CPU for API mode fallback
+          transcript = await transcribeYouTubeWithWhisper(
+            videoId,
+            selectedWhisperModel,
+            undefined, // auto-detect language
+            device,
+            startTimeSeconds,
+            endTimeSeconds,
+            user?.uid // Pass user ID for Firebase Storage
+          );
+          console.log(`[Home] Whisper fallback success:`, {
+            length: transcript?.length || 0,
+            preview: transcript?.substring(0, 100) || "empty"
+          });
+        }
+      } else {
+        // GPU mode: Use Whisper on GPU
+        console.log(`[Home] Using Whisper to transcribe YouTube video: ${videoId} (GPU mode)`);
+        const device = selectedWhisperDevice === "gpu" ? "cuda" : "cpu";
+        transcript = await transcribeYouTubeWithWhisper(
+          videoId,
+          selectedWhisperModel,
+          undefined, // auto-detect language
+          device,
+          startTimeSeconds,
+          endTimeSeconds,
+          user?.uid // Pass user ID for Firebase Storage
+        );
+      }
       
       console.log(`[Home] Transcript received:`, {
         length: transcript?.length || 0,
         preview: transcript?.substring(0, 100) || "empty",
-        method: "Whisper",
-        device: selectedWhisperDevice
+        method: selectedModel === "gpu" ? "Whisper (GPU)" : "YouTube Transcript API (with Whisper fallback)"
       });
       
       if (!transcript || transcript.length === 0) {
